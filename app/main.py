@@ -6,7 +6,7 @@ from flask import (
 
 from .auth import login_required, active_required, access_active
 from .db import query, execute, now_iso
-from .services import cv_parser, ai
+from .services import cv_parser, ai, pdf
 from .services.emailer import send_application, EmailError
 
 bp = Blueprint("main", __name__)
@@ -201,8 +201,10 @@ def _send_one(app):
         f"Application: {app['job_title']}" if app["job_title"]
         else f"Job application from {user['full_name']}"
     )
-    cv_bytes = (app["tailored_cv"] or user["cv_text"]).encode("utf-8")
-    cv_name = f"CV - {user['full_name']}.txt"
+    cv_content = app["tailored_cv"] or user["cv_text"]
+    contact = " | ".join(p for p in (user["smtp_user"], user["phone"]) if p)
+    cv_bytes = pdf.build_pdf(user["full_name"], cv_content, contact_line=contact)
+    cv_name = f"CV - {user['full_name']}.pdf"
 
     try:
         send_application(

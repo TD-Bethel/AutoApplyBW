@@ -40,11 +40,13 @@ def send_application(user, app_config, to_email, subject, body,
     msg.set_content(body)
 
     if attachment_bytes:
+        filename = attachment_name or "cv.pdf"
+        subtype = "pdf" if filename.lower().endswith(".pdf") else "octet-stream"
         msg.add_attachment(
             attachment_bytes,
             maintype="application",
-            subtype="octet-stream",
-            filename=attachment_name or "cv.txt",
+            subtype=subtype,
+            filename=filename,
         )
 
     try:

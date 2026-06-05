@@ -6,9 +6,15 @@
 {% if not is_active %}
   <div class="notice">
     <strong>Your account is pending activation.</strong>
-    Pay your subscription (Orange Money / MyZaka / bank transfer) and contact the admin to
-    unlock CV tailoring and sending. You can still set up your profile in
+    Pay your subscription and contact the admin to unlock CV tailoring and sending.
+    You can still set up your profile in
     <a href="{{ url_for('main.settings') }}">Settings</a>.
+    <p class="pay-numbers">
+      <strong>Orange Money:</strong> +267 74 390 351 &nbsp;•&nbsp;
+      <strong>Pay2cell / Ewallet:</strong> +267 74 390 351 &nbsp;•&nbsp;
+      <strong>MyZaka:</strong> +267 71 847 749 &nbsp;•&nbsp;
+      <strong>Smega:</strong> +267 76 834 418
+    </p>
   </div>
 {% endif %}
 
