@@ -6,36 +6,38 @@ diagram rendered.
 
 ```mermaid
 flowchart TD
-    Browser["🌐 Browser<br/>(user / admin)"]
+    Browser["Browser (user / admin)"]
 
-    subgraph App["Flask app — run.py → waitress (4 threads)"]
-        Factory["create_app()<br/>app/__init__.py<br/>config · admin · sessions"]
+    subgraph App["Flask app - waitress (4 threads)"]
+        Factory["create_app - config, admin, sessions"]
 
         subgraph Blueprints["Route blueprints"]
-            Auth["auth.py<br/>register / login<br/>access control"]
-            Main["main.py<br/>dashboard, CV,<br/>jobs, send, settings"]
-            Admin["admin.py<br/>activate / suspend<br/>(owner only)"]
+            Auth["auth.py - register / login / access"]
+            Main["main.py - dashboard, CV, jobs, send"]
+            Admin["admin.py - activate / suspend"]
         end
 
         subgraph Services["Service layer"]
-            CVParser["cv_parser.py<br/>PDF/DOCX/TXT → text"]
-            AI["ai.py<br/>review + tailor<br/>+ HUMANIZER"]
-            PDF["pdf.py<br/>CV → PDF (fpdf2)"]
-            Emailer["emailer.py<br/>SMTP send"]
+            CVParser["cv_parser.py - file to text"]
+            AI["ai.py - review, tailor, humanizer"]
+            PDF["pdf.py - CV to PDF, fpdf2"]
+            Emailer["emailer.py - SMTP send"]
         end
 
-        DB["db.py<br/>stdlib sqlite3<br/>query() / execute()"]
+        DB["db.py - sqlite3 query/execute"]
     end
 
-    Skill["humanizer_skill.md<br/>(bundled prompt)"]
-    Claude["☁️ Anthropic Claude API<br/>(if API key set)"]
-    Rules["Offline rules<br/>_tailor_rules +<br/>_rule_humanize"]
-    SQLite[("instance/autoapply.db<br/>users · applications")]
-    SMTP["✉️ User's SMTP<br/>(Gmail, etc.)"]
-    Company["🏢 Company inbox"]
+    Skill["humanizer_skill.md (bundled prompt)"]
+    Claude["Anthropic Claude API (if key set)"]
+    Rules["Offline rules - tailor + rule_humanize"]
+    SQLite[("autoapply.db - users, applications")]
+    SMTP["User SMTP (Gmail, etc.)"]
+    Company["Company inbox"]
 
     Browser -->|HTTPS| Factory
-    Factory --> Auth & Main & Admin
+    Factory --> Auth
+    Factory --> Main
+    Factory --> Admin
 
     Main --> CVParser
     Main --> AI
@@ -44,7 +46,7 @@ flowchart TD
 
     AI -->|key set| Claude
     AI -->|no key| Rules
-    Claude -. uses .-> Skill
+    Claude -->|uses| Skill
 
     Auth --> DB
     Main --> DB
