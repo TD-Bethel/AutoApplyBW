@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Admin — AutoApply BW{% endblock %}
+{% block content %}
+<h1>Admin panel</h1>
+<div class="row">
+  <div class="card"><span class="muted">Total users</span><div class="score">{{ stats.total }}</div></div>
+  <div class="card"><span class="muted">Active</span><div class="score good">{{ stats.active }}</div></div>
+  <div class="card"><span class="muted">Pending</span><div class="score mid">{{ stats.pending }}</div></div>
+</div>
+
+<div class="card">
+  <h2>Users</h2>
+  <table>
+    <thead>
+      <tr><th>Name / Email</th><th>Phone</th><th>Status</th><th>Expires</th><th>Apps</th><th>Manage</th></tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td><strong>{{ u['full_name'] or '—' }}</strong><br><span class="muted">{{ u['email'] }}</span>
+            {% if u['role'] == 'admin' %} <span class="badge active">admin</span>{% endif %}</td>
+        <td>{{ u['phone'] or '—' }}</td>
+        <td><span class="badge {{ u['status'] }}">{{ u['status'] }}</span></td>
+        <td>{{ u['access_expires'] or '—' }}</td>
+        <td>{{ u['sent_count'] }}/{{ u['app_count'] }} sent</td>
+        <td>
+          {% if u['role'] != 'admin' %}
+          <form method="post" action="{{ url_for('admin.activate', user_id=u['id']) }}" style="display:flex;gap:0.3rem;align-items:center;margin-bottom:0.3rem">
+            <input type="date" name="access_expires" value="{{ u['access_expires'] or '' }}" style="width:auto;padding:0.25rem">
+            <button class="btn small" type="submit">Activate</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.suspend', user_id=u['id']) }}" class="inline">
+            <button class="btn small danger" type="submit">Suspend</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.set_pending', user_id=u['id']) }}" class="inline">
+            <button class="btn small secondary" type="submit">Set pending</button>
+          </form>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted" style="font-size:0.85rem">Tip: leave the date blank when activating for unlimited access, or set a date for a subscription that expires.</p>
+</div>
+{% endblock %}

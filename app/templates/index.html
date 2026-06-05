@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Apply to more jobs, the smart way.</h1>
+  <p>AutoApply BW helps Batswana youth check their CV, tailor it to each job,
+     and send professional applications to many companies — without the copy-paste grind.</p>
+  <a class="btn" href="{{ url_for('auth.register') }}">Get started</a>
+  <a class="btn secondary" href="{{ url_for('auth.login') }}">Log in</a>
+</section>
+
+<section class="features">
+  <div class="feature">
+    <h3>✔ CV check</h3>
+    <p class="muted">Get a score and clear, specific suggestions to improve your CV.</p>
+  </div>
+  <div class="feature">
+    <h3>🎯 Tailored to each job</h3>
+    <p class="muted">Your CV and cover letter are rewritten to match each job description.</p>
+  </div>
+  <div class="feature">
+    <h3>📧 Send to many companies</h3>
+    <p class="muted">Personalised applications, sent from your own email, safely rate-limited.</p>
+  </div>
+</section>
+
+<div class="card" style="margin-top:1.5rem">
+  <h2>How access works</h2>
+  <ol>
+    <li>Sign up for a free account.</li>
+    <li>Pay the subscription (Orange Money / MyZaka / bank transfer) and contact the admin.</li>
+    <li>Your account is activated and you get full access to CV tailoring and sending.</li>
+  </ol>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Application — AutoApply BW{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('main.dashboard') }}">&larr; Back to dashboard</a></p>
+<h1>{{ app['job_title'] or 'Application' }}</h1>
+<p class="muted">
+  To: {{ app['company_name'] or app['company_email'] }} ({{ app['company_email'] }}) ·
+  <span class="badge {{ app['status'] }}">{{ app['status'] }}</span>
+</p>
+{% if app['error'] %}<div class="flash flash-danger">{{ app['error'] }}</div>{% endif %}
+
+{% if app['job_description'] %}
+<div class="card">
+  <h2>Job description</h2>
+  <p style="white-space:pre-wrap">{{ app['job_description'] }}</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Tailored application</h2>
+  {% if not app['cover_letter'] and not app['tailored_cv'] %}
+    <p class="muted">Not tailored yet. Generate a tailored CV and cover letter for this job.</p>
+    <form method="post" action="{{ url_for('main.job_tailor', app_id=app['id']) }}">
+      <button class="btn" type="submit">Tailor for this job</button>
+    </form>
+  {% else %}
+    <form method="post" action="{{ url_for('main.job_edit', app_id=app['id']) }}">
+      <label for="cover_letter">Cover letter (edit before sending)</label>
+      <textarea id="cover_letter" name="cover_letter" style="min-height:220px">{{ app['cover_letter'] }}</textarea>
+      <label for="tailored_cv">Tailored CV text (sent as attachment)</label>
+      <textarea id="tailored_cv" name="tailored_cv" style="min-height:220px">{{ app['tailored_cv'] }}</textarea>
+      <button class="btn secondary" type="submit">Save edits</button>
+    </form>
+    <hr>
+    <div class="row">
+      <form method="post" action="{{ url_for('main.job_tailor', app_id=app['id']) }}">
+        <button class="btn secondary" type="submit">Re-tailor</button>
+      </form>
+      <form method="post" action="{{ url_for('main.job_send', app_id=app['id']) }}">
+        <button class="btn" type="submit" onclick="return confirm('Send this application now?')">Send application</button>
+      </form>
+      <form method="post" action="{{ url_for('main.job_delete', app_id=app['id']) }}">
+        <button class="btn danger" type="submit" onclick="return confirm('Delete this application?')">Delete</button>
+      </form>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

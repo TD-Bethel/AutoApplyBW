@@ -1,0 +1,91 @@
+"""Thin SQLite data layer (stdlib only, no ORM).
+
+Kept dependency-free on purpose so the app installs and runs on any Python
+version without compiling native wheels.
+"""
+import os
+import sqlite3
+from datetime import datetime, timezone
+from flask import g, current_app
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    email         TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    full_name     TEXT NOT NULL DEFAULT '',
+    phone         TEXT NOT NULL DEFAULT '',
+    role          TEXT NOT NULL DEFAULT 'user',      -- 'user' | 'admin'
+    status        TEXT NOT NULL DEFAULT 'pending',   -- 'pending' | 'active' | 'suspended'
+    access_expires TEXT,                              -- ISO date; NULL = no expiry
+    cv_text       TEXT NOT NULL DEFAULT '',
+    cv_filename   TEXT NOT NULL DEFAULT '',
+    -- per-user outbound email settings (so each user sends from their own inbox)
+    smtp_host     TEXT NOT NULL DEFAULT '',
+    smtp_port     INTEGER NOT NULL DEFAULT 587,
+    smtp_user     TEXT NOT NULL DEFAULT '',
+    smtp_password TEXT NOT NULL DEFAULT '',
+    from_name     TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS applications (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL,
+    company_name    TEXT NOT NULL DEFAULT '',
+    company_email   TEXT NOT NULL,
+    job_title       TEXT NOT NULL DEFAULT '',
+    job_description TEXT NOT NULL DEFAULT '',
+    tailored_cv     TEXT NOT NULL DEFAULT '',
+    cover_letter    TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'draft',   -- 'draft' | 'tailored' | 'sent' | 'failed'
+    error           TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL,
+    sent_at         TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_apps_user ON applications(user_id);
+"""
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def get_db():
+    if "db" not in g:
+        path = current_app.config["DATABASE_PATH"]
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        g.db = sqlite3.connect(path)
+        g.db.row_factory = sqlite3.Row
+        g.db.execute("PRAGMA foreign_keys = ON")
+    return g.db
+
+
+def close_db(exc=None):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
+
+
+def init_db():
+    db = get_db()
+    db.executescript(SCHEMA)
+    db.commit()
+
+
+def query(sql, args=(), one=False):
+    cur = get_db().execute(sql, args)
+    rows = cur.fetchall()
+    cur.close()
+    return (rows[0] if rows else None) if one else rows
+
+
+def execute(sql, args=()):
+    db = get_db()
+    cur = db.execute(sql, args)
+    db.commit()
+    last_id = cur.lastrowid
+    cur.close()
+    return last_id

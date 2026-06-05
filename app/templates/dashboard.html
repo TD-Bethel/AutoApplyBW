@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — AutoApply BW{% endblock %}
+{% block content %}
+<h1>Welcome, {{ g.user['full_name'] or g.user['email'] }}</h1>
+
+{% if not is_active %}
+  <div class="notice">
+    <strong>Your account is pending activation.</strong>
+    Pay your subscription (Orange Money / MyZaka / bank transfer) and contact the admin to
+    unlock CV tailoring and sending. You can still set up your profile in
+    <a href="{{ url_for('main.settings') }}">Settings</a>.
+  </div>
+{% endif %}
+
+{# ---------------- CV section ---------------- #}
+<div class="card">
+  <h2>1. Your CV</h2>
+  {% if g.user['cv_filename'] %}
+    <p class="muted">Current CV: <strong>{{ g.user['cv_filename'] }}</strong></p>
+  {% else %}
+    <p class="muted">No CV uploaded yet.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('main.cv_upload') }}" enctype="multipart/form-data">
+    <label for="cv_file">Upload CV (PDF, DOCX, or TXT)</label>
+    <input id="cv_file" name="cv_file" type="file" accept=".pdf,.docx,.txt" required {{ '' if is_active else 'disabled' }}>
+    <button class="btn" type="submit" style="margin-top:0.75rem" {{ '' if is_active else 'disabled' }}>Upload &amp; read CV</button>
+  </form>
+  {% if g.user['cv_text'] %}
+    <form method="post" action="{{ url_for('main.cv_review') }}" class="inline">
+      <button class="btn secondary" type="submit" {{ '' if is_active else 'disabled' }}>Check my CV</button>
+    </form>
+  {% endif %}
+
+  {% if review %}
+    <hr>
+    {% set band = 'good' if review.score >= 75 else ('mid' if review.score >= 50 else 'low') %}
+    <p>CV score: <span class="score {{ band }}">{{ review.score }}</span><span class="muted">/100 · {{ review.powered_by }}</span></p>
+    {% if review.strengths %}
+      <strong>Strengths</strong>
+      <ul class="tight">{% for s in review.strengths %}<li>{{ s }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if review.issues %}
+      <strong>Suggestions</strong>
+      <ul class="tight">{% for s in review.issues %}<li>{{ s }}</li>{% endfor %}</ul>
+    {% endif %}
+  {% endif %}
+</div>
+
+{# ---------------- Add job ---------------- #}
+<div class="card">
+  <h2>2. Add a job to apply for</h2>
+  <form method="post" action="{{ url_for('main.job_add') }}">
+    <div class="row">
+      <div><label for="company_name">Company name</label>
+      <input id="company_name" name="company_name" placeholder="e.g. Botswana Power Corporation"></div>
+      <div><label for="company_email">Company email</label>
+      <input id="company_email" name="company_email" type="email" required placeholder="hr@company.co.bw"></div>
+    </div>
+    <label for="job_title">Job title</label>
+    <input id="job_title" name="job_title" placeholder="e.g. Graduate Trainee">
+    <label for="job_description">Job description (paste from the advert)</label>
+    <textarea id="job_description" name="job_description" placeholder="Paste the job requirements here so the CV can be tailored to match."></textarea>
+    <button class="btn" type="submit" style="margin-top:0.75rem" {{ '' if is_active else 'disabled' }}>Add application</button>
+  </form>
+</div>
+
+{# ---------------- Applications list ---------------- #}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2 style="margin:0">3. Your applications</h2>
+    {% if apps %}
+    <form method="post" action="{{ url_for('main.job_send_all') }}">
+      <button class="btn small" type="submit" {{ '' if is_active else 'disabled' }}
+        onclick="return confirm('Send all tailored/draft applications now?')">Send all</button>
+    </form>
+    {% endif %}
+  </div>
+  <p class="muted" style="font-size:0.85rem">Sent in the last hour: {{ sent_last_hour }} / {{ rate_limit }} (anti-spam limit)</p>
+  {% if apps %}
+  <table>
+    <thead><tr><th>Company</th><th>Job</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for a in apps %}
+      <tr>
+        <td>{{ a['company_name'] or a['company_email'] }}</td>
+        <td>{{ a['job_title'] or '—' }}</td>
+        <td><span class="badge {{ a['status'] }}">{{ a['status'] }}</span></td>
+        <td><a class="btn small secondary" href="{{ url_for('main.job_view', app_id=a['id']) }}">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="muted">No applications yet. Add one above.</p>
+  {% endif %}
+</div>
+{% endblock %}
