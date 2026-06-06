@@ -1,0 +1,26 @@
+# Keep the image small and never ship secrets or local data.
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Secrets and local user data (set these via fly secrets / the volume instead)
+.env
+*.env
+!.env.example
+instance/
+*.db
+*.sqlite
+*.sqlite3
+uploads/
+
+# Dev-only files
+.git/
+.gitignore
+*.log
+.vscode/
+.idea/
+docs/
+README.md

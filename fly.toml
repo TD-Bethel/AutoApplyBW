@@ -1,0 +1,30 @@
+# Fly.io config for AutoApply BW.
+# Change `app` to a globally-unique name if "autoapply-bw" is taken.
+app = "autoapply-bw"
+primary_region = "jnb"   # Johannesburg — closest Fly region to Botswana
+
+[build]
+
+# Non-secret config. Secrets (SECRET_KEY, ADMIN_*, ANTHROPIC_API_KEY) are set
+# with `fly secrets set ...` so they never live in this file.
+[env]
+  HOST = "0.0.0.0"
+  PORT = "8080"
+  DATABASE_PATH = "/data/autoapply.db"   # on the persistent volume below
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0   # set to 1 to avoid cold starts (costs a bit more)
+
+# Persistent disk so the SQLite database (users, CVs, applications) survives
+# restarts and redeploys. NOTE: a volume binds to ONE machine — keep count = 1.
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
