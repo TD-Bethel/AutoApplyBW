@@ -1,31 +1,74 @@
 """Application factory for AutoApply BW."""
 import os
+import secrets
+from datetime import timedelta
+
 from flask import Flask
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
 from . import db
+from .security import csrf_protect, csrf_token
+
+
+def _int_env(name, default):
+    try:
+        return int(os.getenv(name, "") or default)
+    except ValueError:
+        return default
 
 
 def create_app():
     load_dotenv()
     app = Flask(__name__, instance_relative_config=False)
 
+    secret_key = os.getenv("SECRET_KEY", "").strip()
+    if not secret_key or secret_key in ("dev-insecure-change-me",
+                                        "please-change-this-to-a-long-random-string"):
+        # Never run with a known/guessable secret. A random one keeps the app
+        # safe (sessions just reset on restart) until SECRET_KEY is set.
+        secret_key = secrets.token_hex(32)
+        app.logger.warning(
+            "SECRET_KEY is not set in .env — using a temporary random key. "
+            "Logins will not survive a restart until you set it."
+        )
+
     app.config.update(
-        SECRET_KEY=os.getenv("SECRET_KEY", "dev-insecure-change-me"),
+        SECRET_KEY=secret_key,
         DATABASE_PATH=os.getenv("DATABASE_PATH", "instance/autoapply.db"),
         ANTHROPIC_API_KEY=os.getenv("ANTHROPIC_API_KEY", "").strip(),
         ANTHROPIC_MODEL=os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8").strip(),
         SMTP_HOST=os.getenv("SMTP_HOST", "").strip(),
-        SMTP_PORT=int(os.getenv("SMTP_PORT", "587") or 587),
+        SMTP_PORT=_int_env("SMTP_PORT", 587),
         SMTP_USER=os.getenv("SMTP_USER", "").strip(),
         SMTP_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
         SMTP_FROM_NAME=os.getenv("SMTP_FROM_NAME", "AutoApply BW"),
-        SEND_RATE_PER_HOUR=int(os.getenv("SEND_RATE_PER_HOUR", "30") or 30),
+        SEND_RATE_PER_HOUR=_int_env("SEND_RATE_PER_HOUR", 30),
         MAX_CONTENT_LENGTH=10 * 1024 * 1024,  # 10 MB upload cap
+        # Session-cookie hardening
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE", "0") == "1",
+        PERMANENT_SESSION_LIFETIME=timedelta(days=14),
     )
 
     app.teardown_appcontext(db.close_db)
+
+    # CSRF: every state-changing request must carry the session token.
+    app.before_request(csrf_protect)
+    app.context_processor(lambda: {"csrf_token": csrf_token})
+
+    @app.after_request
+    def security_headers(resp):
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault("X-Frame-Options", "DENY")
+        resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        resp.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; script-src 'self'; frame-ancestors 'none'",
+        )
+        return resp
 
     # Blueprints
     from .auth import bp as auth_bp

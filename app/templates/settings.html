@@ -6,6 +6,7 @@
 <div class="card">
   <h2>Profile</h2>
   <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="row">
       <div><label for="full_name">Full name</label>
       <input id="full_name" name="full_name" value="{{ u['full_name'] }}"></div>
@@ -28,11 +29,26 @@
     <label for="smtp_user">Your email address</label>
     <input id="smtp_user" name="smtp_user" type="email" value="{{ u['smtp_user'] }}" placeholder="you@gmail.com">
     <label for="smtp_password">App password</label>
-    <input id="smtp_password" name="smtp_password" type="password" value="{{ u['smtp_password'] }}" placeholder="••••••••">
+    <input id="smtp_password" name="smtp_password" type="password" autocomplete="off"
+           placeholder="{{ '•••••••• (saved — leave blank to keep)' if u['smtp_password'] else 'app password' }}">
     <label for="from_name">Display name on emails</label>
     <input id="from_name" name="from_name" value="{{ u['from_name'] }}" placeholder="{{ u['full_name'] }}">
 
     <button class="btn" type="submit" style="margin-top:1rem">Save settings</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Change password</h2>
+  <form method="post" action="{{ url_for('auth.change_password') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="row">
+      <div><label for="current_password">Current password</label>
+      <input id="current_password" name="current_password" type="password" autocomplete="current-password" required></div>
+      <div><label for="new_password">New password (8+ characters)</label>
+      <input id="new_password" name="new_password" type="password" minlength="8" autocomplete="new-password" required></div>
+    </div>
+    <button class="btn secondary" type="submit" style="margin-top:1rem">Change password</button>
   </form>
 </div>
 {% endblock %}

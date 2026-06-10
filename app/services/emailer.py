@@ -5,12 +5,20 @@ deliberate: blasting many companies from one shared mailbox gets flagged as spam
 and blacklisted. Per-user, personalised, rate-limited sending is both safer and
 more effective.
 """
+import re
 import smtplib
 from email.message import EmailMessage
+
+from ..security import valid_email
 
 
 class EmailError(Exception):
     pass
+
+
+def _header_safe(value):
+    """Strip CR/LF so user-supplied text can never inject extra headers."""
+    return re.sub(r"[\r\n]+", " ", value or "").strip()
 
 
 def resolve_sender(user, app_config):
@@ -32,6 +40,13 @@ def resolve_sender(user, app_config):
 def send_application(user, app_config, to_email, subject, body,
                      attachment_name=None, attachment_bytes=None):
     host, port, username, password, from_name, from_addr = resolve_sender(user, app_config)
+
+    to_email = _header_safe(to_email)
+    if not valid_email(to_email):
+        raise EmailError(f"'{to_email}' is not a valid recipient email address.")
+    subject = _header_safe(subject)
+    from_name = _header_safe(from_name).replace('"', "")
+    from_addr = _header_safe(from_addr)
 
     msg = EmailMessage()
     msg["Subject"] = subject

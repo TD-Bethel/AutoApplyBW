@@ -7,22 +7,39 @@ Access model (owner stays in control):
   - AI + email features require an 'active', non-expired account.
 """
 import functools
-from datetime import date, datetime
+from datetime import date
 from flask import (
     Blueprint, render_template, request, redirect, url_for, session, flash, g, abort
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from .db import query, execute, now_iso
+from .security import (
+    valid_email, safe_next, too_many_attempts, record_failed_attempt, clear_attempts,
+)
 
 bp = Blueprint("auth", __name__)
+
+# Constant-time-ish login even when the email doesn't exist: always verify
+# against some hash so attackers can't probe which emails are registered.
+_DUMMY_HASH = generate_password_hash("not-a-real-password")
+
+MAX_EMAIL = 254
+MAX_NAME = 120
+MAX_PHONE = 40
+MAX_PASSWORD = 200
 
 
 def load_user():
     uid = session.get("user_id")
     if uid is None:
         return None
-    return query("SELECT * FROM users WHERE id = ?", (uid,), one=True)
+    user = query("SELECT * FROM users WHERE id = ?", (uid,), one=True)
+    if user is not None and user["status"] == "suspended":
+        # Suspension takes effect immediately, not just at next login.
+        session.clear()
+        return None
+    return user
 
 
 @bp.before_app_request
@@ -39,7 +56,7 @@ def access_active(user):
             if date.fromisoformat(user["access_expires"]) < date.today():
                 return False
         except ValueError:
-            pass
+            return False  # unparseable expiry = no access, never silent unlimited
     return True
 
 
@@ -79,13 +96,13 @@ def register():
     if g.user:
         return redirect(url_for("main.dashboard"))
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
-        full_name = request.form.get("full_name", "").strip()
-        phone = request.form.get("phone", "").strip()
+        email = request.form.get("email", "").strip().lower()[:MAX_EMAIL]
+        password = request.form.get("password", "")[:MAX_PASSWORD]
+        full_name = request.form.get("full_name", "").strip()[:MAX_NAME]
+        phone = request.form.get("phone", "").strip()[:MAX_PHONE]
 
         error = None
-        if not email or "@" not in email:
+        if not valid_email(email):
             error = "A valid email is required."
         elif len(password) < 8:
             error = "Password must be at least 8 characters."
@@ -112,22 +129,51 @@ def login():
     if g.user:
         return redirect(url_for("main.dashboard"))
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
+        email = request.form.get("email", "").strip().lower()[:MAX_EMAIL]
+        password = request.form.get("password", "")[:MAX_PASSWORD]
+
+        if too_many_attempts(email):
+            flash("Too many failed attempts. Please wait 15 minutes and try again.", "danger")
+            return render_template("login.html")
+
         user = query("SELECT * FROM users WHERE email = ?", (email,), one=True)
-        if user is None or not check_password_hash(user["password_hash"], password):
+        password_ok = check_password_hash(
+            user["password_hash"] if user else _DUMMY_HASH, password
+        )
+        if user is None or not password_ok:
+            record_failed_attempt(email)
             flash("Incorrect email or password.", "danger")
         elif user["status"] == "suspended":
             flash("This account has been suspended. Contact the admin.", "danger")
         else:
+            clear_attempts(email)
             session.clear()
             session["user_id"] = user["id"]
-            nxt = request.args.get("next")
+            session.permanent = True
+            nxt = safe_next(request.args.get("next"))
             return redirect(nxt or url_for("main.dashboard"))
     return render_template("login.html")
 
 
-@bp.route("/logout")
+@bp.route("/password", methods=["POST"])
+@login_required
+def change_password():
+    current = request.form.get("current_password", "")[:MAX_PASSWORD]
+    new = request.form.get("new_password", "")[:MAX_PASSWORD]
+    if not check_password_hash(g.user["password_hash"], current):
+        flash("Your current password is incorrect.", "danger")
+    elif len(new) < 8:
+        flash("New password must be at least 8 characters.", "danger")
+    else:
+        execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (generate_password_hash(new), g.user["id"]),
+        )
+        flash("Password changed.", "success")
+    return redirect(url_for("main.settings"))
+
+
+@bp.route("/logout", methods=["POST"])
 def logout():
     session.clear()
     flash("You have been logged out.", "info")

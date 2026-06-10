@@ -26,14 +26,22 @@
         <td>
           {% if u['role'] != 'admin' %}
           <form method="post" action="{{ url_for('admin.activate', user_id=u['id']) }}" style="display:flex;gap:0.3rem;align-items:center;margin-bottom:0.3rem">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
             <input type="date" name="access_expires" value="{{ u['access_expires'] or '' }}" style="width:auto;padding:0.25rem">
             <button class="btn small" type="submit">Activate</button>
           </form>
           <form method="post" action="{{ url_for('admin.suspend', user_id=u['id']) }}" class="inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
             <button class="btn small danger" type="submit">Suspend</button>
           </form>
           <form method="post" action="{{ url_for('admin.set_pending', user_id=u['id']) }}" class="inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
             <button class="btn small secondary" type="submit">Set pending</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.delete_user', user_id=u['id']) }}" class="inline"
+                data-confirm="Permanently delete {{ u['email'] }} and all their applications?">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="btn small danger" type="submit">Delete</button>
           </form>
           {% else %}<span class="muted">—</span>{% endif %}
         </td>

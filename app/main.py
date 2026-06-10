@@ -6,8 +6,13 @@ from flask import (
 
 from .auth import login_required, active_required, access_active
 from .db import query, execute, now_iso
+from .security import valid_email
 from .services import cv_parser, ai, pdf
 from .services.emailer import send_application, EmailError
+
+MAX_CV_CHARS = 200_000      # caps pathological uploads (e.g. zip-bombed DOCX)
+MAX_JOB_DESC_CHARS = 30_000
+MAX_FIELD = 200
 
 bp = Blueprint("main", __name__)
 
@@ -50,7 +55,7 @@ def cv_upload():
         return redirect(url_for("main.dashboard"))
     execute(
         "UPDATE users SET cv_text = ?, cv_filename = ? WHERE id = ?",
-        (text, file.filename, g.user["id"]),
+        (text[:MAX_CV_CHARS], file.filename[:MAX_FIELD], g.user["id"]),
     )
     flash("CV uploaded and read successfully.", "success")
     return redirect(url_for("main.dashboard"))
@@ -79,11 +84,11 @@ def cv_review():
 @bp.route("/jobs/add", methods=["POST"])
 @active_required
 def job_add():
-    company = request.form.get("company_name", "").strip()
-    email = request.form.get("company_email", "").strip()
-    title = request.form.get("job_title", "").strip()
-    desc = request.form.get("job_description", "").strip()
-    if not email or "@" not in email:
+    company = request.form.get("company_name", "").strip()[:MAX_FIELD]
+    email = request.form.get("company_email", "").strip()[:MAX_FIELD]
+    title = request.form.get("job_title", "").strip()[:MAX_FIELD]
+    desc = request.form.get("job_description", "").strip()[:MAX_JOB_DESC_CHARS]
+    if not valid_email(email):
         flash("A valid company email is required.", "danger")
         return redirect(url_for("main.dashboard"))
     execute(
@@ -226,17 +231,24 @@ def _send_one(app):
 @login_required
 def settings():
     if request.method == "POST":
+        try:
+            smtp_port = int(request.form.get("smtp_port") or 587)
+        except ValueError:
+            smtp_port = 587
+        smtp_port = min(max(smtp_port, 1), 65535)
+        # Blank password = keep the existing one (it is never echoed to the page).
+        smtp_password = request.form.get("smtp_password", "") or g.user["smtp_password"]
         execute(
             """UPDATE users SET full_name = ?, phone = ?, smtp_host = ?, smtp_port = ?,
                smtp_user = ?, smtp_password = ?, from_name = ? WHERE id = ?""",
             (
-                request.form.get("full_name", "").strip(),
-                request.form.get("phone", "").strip(),
-                request.form.get("smtp_host", "").strip(),
-                int(request.form.get("smtp_port") or 587),
-                request.form.get("smtp_user", "").strip(),
-                request.form.get("smtp_password", ""),
-                request.form.get("from_name", "").strip(),
+                request.form.get("full_name", "").strip()[:MAX_FIELD],
+                request.form.get("phone", "").strip()[:MAX_FIELD],
+                request.form.get("smtp_host", "").strip()[:MAX_FIELD],
+                smtp_port,
+                request.form.get("smtp_user", "").strip()[:MAX_FIELD],
+                smtp_password,
+                request.form.get("from_name", "").strip()[:MAX_FIELD],
                 g.user["id"],
             ),
         )

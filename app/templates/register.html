@@ -4,6 +4,7 @@
 <div class="card" style="max-width:480px;margin:1.5rem auto">
   <h2>Create your account</h2>
   <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <label for="full_name">Full name</label>
     <input id="full_name" name="full_name" required>
     <label for="email">Email</label>
@@ -11,7 +12,7 @@
     <label for="phone">Phone (optional)</label>
     <input id="phone" name="phone" placeholder="+267 7X XXX XXX">
     <label for="password">Password</label>
-    <input id="password" name="password" type="password" minlength="8" required>
+    <input id="password" name="password" type="password" minlength="8" autocomplete="new-password" required>
     <p class="muted" style="font-size:0.85rem">At least 8 characters.</p>
     <button class="btn" type="submit">Sign up</button>
   </form>

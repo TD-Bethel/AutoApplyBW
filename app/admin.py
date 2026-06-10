@@ -1,4 +1,6 @@
 """Owner/admin panel: control who has access (the paywall is enforced here)."""
+from datetime import date
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, g
 
 from .auth import admin_required
@@ -28,6 +30,12 @@ def index():
 @admin_required
 def activate(user_id):
     expires = request.form.get("access_expires", "").strip() or None
+    if expires:
+        try:
+            date.fromisoformat(expires)
+        except ValueError:
+            flash("Invalid expiry date. Use the date picker (YYYY-MM-DD) or leave it blank.", "danger")
+            return redirect(url_for("admin.index"))
     execute(
         "UPDATE users SET status = 'active', access_expires = ? WHERE id = ?",
         (expires, user_id),
@@ -52,4 +60,19 @@ def suspend(user_id):
 def set_pending(user_id):
     execute("UPDATE users SET status = 'pending', access_expires = NULL WHERE id = ?", (user_id,))
     flash("User set back to pending.", "info")
+    return redirect(url_for("admin.index"))
+
+
+@bp.route("/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def delete_user(user_id):
+    target = query("SELECT * FROM users WHERE id = ?", (user_id,), one=True)
+    if target is None:
+        flash("User not found.", "danger")
+    elif target["role"] == "admin":
+        flash("Admin accounts cannot be deleted from the panel.", "danger")
+    else:
+        execute("DELETE FROM applications WHERE user_id = ?", (user_id,))
+        execute("DELETE FROM users WHERE id = ?", (user_id,))
+        flash(f"Deleted {target['email']} and their applications.", "info")
     return redirect(url_for("admin.index"))

@@ -11,6 +11,7 @@ primary_region = "jnb"   # Johannesburg — closest Fly region to Botswana
   HOST = "0.0.0.0"
   PORT = "8080"
   DATABASE_PATH = "/data/autoapply.db"   # on the persistent volume below
+  COOKIE_SECURE = "1"                    # Fly serves HTTPS (force_https below)
 
 [http_service]
   internal_port = 8080

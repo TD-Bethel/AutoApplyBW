@@ -88,6 +88,7 @@ AutoApplyBW/
 ├── app/
 │   ├── __init__.py         # app factory, config, first-run admin
 │   ├── db.py               # sqlite3 data layer + schema
+│   ├── security.py         # CSRF, login throttling, safe redirects
 │   ├── auth.py             # register/login + access-control decorators
 │   ├── main.py             # dashboard, CV, applications, settings
 │   ├── admin.py            # owner panel: activate / suspend users
@@ -104,9 +105,18 @@ AutoApplyBW/
 
 ## Security & privacy notes
 
+- All state-changing forms are **CSRF-protected** (per-session token, no extra deps).
+- Login is **rate-limited** (8 failed attempts per 15 minutes per IP+email) and uses a
+  constant-time dummy-hash check so attackers can't probe which emails exist.
+- Suspending a user kills their **existing session immediately**, not just new logins.
+- Session cookies are `HttpOnly` + `SameSite=Lax`; set `COOKIE_SECURE=1` in production
+  (HTTPS) so they are `Secure` too. Sessions expire after 14 days.
+- Responses carry security headers (CSP, `X-Frame-Options`, `nosniff`, referrer policy).
+- Email sending strips CR/LF from user-supplied values (no SMTP header injection) and
+  validates recipient addresses.
 - User data (the SQLite DB, including CVs) lives in `instance/` and is **git-ignored**.
-- Email app-passwords are stored in the database. For production, run on a host you
-  control and consider encrypting these at rest.
+- Email app-passwords are stored in the database and are never echoed back into HTML.
+  For production, run on a host you control and consider encrypting these at rest.
 - Never commit your real `.env`.
 
 ---

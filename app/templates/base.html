@@ -15,7 +15,10 @@
         <a href="{{ url_for('main.settings') }}">Settings</a>
         {% if g.user['role'] == 'admin' %}<a href="{{ url_for('admin.index') }}">Admin</a>{% endif %}
         <span class="who">{{ g.user['full_name'] or g.user['email'] }}</span>
-        <a class="btn-link" href="{{ url_for('auth.logout') }}">Log out</a>
+        <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <button class="btn-link" type="submit">Log out</button>
+        </form>
       {% else %}
         <a href="{{ url_for('auth.login') }}">Log in</a>
         <a class="btn-link" href="{{ url_for('auth.register') }}">Sign up</a>
@@ -35,5 +38,6 @@
   <footer class="footer">
     <p>AutoApply BW — helping Batswana youth apply smarter. &copy; {{ 2026 }}</p>
   </footer>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

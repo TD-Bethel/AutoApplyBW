@@ -21,10 +21,12 @@
   {% if not app['cover_letter'] and not app['tailored_cv'] %}
     <p class="muted">Not tailored yet. Generate a tailored CV and cover letter for this job.</p>
     <form method="post" action="{{ url_for('main.job_tailor', app_id=app['id']) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <button class="btn" type="submit">Tailor for this job</button>
     </form>
   {% else %}
     <form method="post" action="{{ url_for('main.job_edit', app_id=app['id']) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <label for="cover_letter">Cover letter (edit before sending)</label>
       <textarea id="cover_letter" name="cover_letter" style="min-height:220px">{{ app['cover_letter'] }}</textarea>
       <label for="tailored_cv">Tailored CV text (sent as attachment)</label>
@@ -34,13 +36,16 @@
     <hr>
     <div class="row">
       <form method="post" action="{{ url_for('main.job_tailor', app_id=app['id']) }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button class="btn secondary" type="submit">Re-tailor</button>
       </form>
-      <form method="post" action="{{ url_for('main.job_send', app_id=app['id']) }}">
-        <button class="btn" type="submit" onclick="return confirm('Send this application now?')">Send application</button>
+      <form method="post" action="{{ url_for('main.job_send', app_id=app['id']) }}" data-confirm="Send this application now?">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="btn" type="submit">Send application</button>
       </form>
-      <form method="post" action="{{ url_for('main.job_delete', app_id=app['id']) }}">
-        <button class="btn danger" type="submit" onclick="return confirm('Delete this application?')">Delete</button>
+      <form method="post" action="{{ url_for('main.job_delete', app_id=app['id']) }}" data-confirm="Delete this application?">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="btn danger" type="submit">Delete</button>
       </form>
     </div>
   {% endif %}
