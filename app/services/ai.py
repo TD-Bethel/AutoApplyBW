@@ -8,12 +8,14 @@ The Claude API is called with plain `requests` (no anthropic SDK) to keep the
 dependency footprint pure-Python.
 """
 import json
+import os
 import re
 from pathlib import Path
 import requests
 from flask import current_app
 
-API_URL = "https://api.anthropic.com/v1/messages"
+# Overridable so tests (or a proxy) can point at a different endpoint.
+API_URL = os.getenv("ANTHROPIC_API_URL", "https://api.anthropic.com/v1/messages")
 ANTHROPIC_VERSION = "2023-06-01"
 TIMEOUT = 90
 

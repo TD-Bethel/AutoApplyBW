@@ -70,8 +70,11 @@ def send_application(user, app_config, to_email, subject, body,
         else:
             server = smtplib.SMTP(host, port, timeout=30)
             server.ehlo()
-            server.starttls()
-            server.ehlo()
+            # Real providers (Gmail, Outlook) always offer STARTTLS and get it.
+            # Skipping it when absent keeps local/dev relays usable.
+            if server.has_extn("starttls"):
+                server.starttls()
+                server.ehlo()
         with server:
             server.login(username, password)
             server.send_message(msg)
