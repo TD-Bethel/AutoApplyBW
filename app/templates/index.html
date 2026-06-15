@@ -1,31 +1,87 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero">
-  <h1>Apply to more jobs, the smart way.</h1>
-  <p>AutoApply BW helps Batswana youth check their CV, tailor it to each job,
-     and send professional applications to many companies — without the copy-paste grind.</p>
-  <a class="btn" href="{{ url_for('auth.register') }}">Get started</a>
-  <a class="btn secondary" href="{{ url_for('auth.login') }}">Log in</a>
+<section class="hero hero-split">
+  <div class="hero-copy">
+    <p class="hero-kicker">For Botswana's next generation</p>
+    <h1>Apply to more jobs, the smart way.</h1>
+    <p>AutoApply BW helps Batswana youth check their CV, tailor it to each job,
+       and send professional applications to many companies — without the
+       copy-paste grind.</p>
+    <div class="hero-actions">
+      <a class="btn" href="{{ url_for('auth.register') }}">Get started</a>
+      <a class="btn secondary" href="{{ url_for('auth.login') }}">Log in</a>
+    </div>
+    <div class="stat-strip">
+      <div><strong>Live vacancies</strong><span>from real employers across 4 SADC countries</span></div>
+      <div><strong>AI-tailored</strong><span>CV and cover letter for every single job</span></div>
+      <div><strong>Your inbox</strong><span>applications sent from your own email</span></div>
+    </div>
+  </div>
+  <div class="hero-slides" id="hero-slides" aria-label="Botswana now — current affairs">
+    {% set slides = [
+      ("img/letsile-tebogo.jpg", "Letsile Tebogo: Olympic champion",
+       "Botswana's sprint king inspires a generation. Run your own race.",
+       "Photo: Wikimedia Commons (CC0)"),
+      ("img/slide-boko.jpg", "A new era of leadership",
+       "President Duma Boko's government has put youth employment at the centre of its agenda.",
+       "Photo: Aficionado538, Wikimedia Commons (CC0)"),
+      ("img/slide-independence.jpg", "Botswana turns 60",
+       "The diamond jubilee of independence arrives on 30 September 2026.",
+       "Photo: Mahyar Sheykhi (CC BY-SA 4.0)"),
+      ("img/slide-jwaneng.jpg", "Diamonds still power the economy",
+       "Jwaneng — the world's richest diamond mine — anchors thousands of careers.",
+       "Photo: Wikimedia Commons (public domain)"),
+      ("img/slide-gaborone.jpg", "Gaborone is rising",
+       "Cranes over the CBD mean new employers, new offices, new opportunities.",
+       "Photo: Thabang S. Peter (CC BY-SA 4.0)"),
+      ("img/okavango.jpg", "The Delta works for Botswana",
+       "Tourism in the Okavango is one of the country's biggest employers.",
+       "Photo: Diego Delso (CC BY-SA 4.0)"),
+      ("img/setswana.jpg", "Culture on the world stage",
+       "Setswana heritage travels further every year — and so do its people.",
+       "Photo: Temptious (CC0)"),
+    ] %}
+    {% for src, headline, sub, credit in slides %}
+    <figure class="hero-slide{{ ' active' if loop.first }}">
+      <img src="{{ url_for('static', filename=src) }}" alt="{{ headline }}"
+           {{ 'loading=lazy'|safe if not loop.first }}>
+      <figcaption>
+        <span class="caption-line">{{ headline }}</span>
+        <span class="caption-sub">{{ sub }}</span>
+        <span class="caption-credit">{{ credit }}</span>
+      </figcaption>
+    </figure>
+    {% endfor %}
+    <div class="slide-dots">
+      {% for s in slides %}
+      <button type="button" class="slide-dot{{ ' active' if loop.first }}"
+              data-slide="{{ loop.index0 }}" aria-label="Slide {{ loop.index }}"></button>
+      {% endfor %}
+    </div>
+  </div>
 </section>
 
 <section class="features">
   <div class="feature">
+    <div class="feature-num">01</div>
     <h3>CV check</h3>
     <p class="muted">Get a score and clear, specific suggestions to improve your CV.</p>
   </div>
   <div class="feature">
+    <div class="feature-num">02</div>
     <h3>Tailored to each job</h3>
     <p class="muted">Your CV and cover letter are rewritten to match each job description.</p>
   </div>
   <div class="feature">
+    <div class="feature-num">03</div>
     <h3>Send to many companies</h3>
     <p class="muted">Personalised applications, sent from your own email, safely rate-limited.</p>
   </div>
 </section>
 
-<div class="card" style="margin-top:1.5rem">
+<div class="card steps-card">
   <h2>How access works</h2>
-  <ol>
+  <ol class="steps">
     <li>Sign up for a free account.</li>
     <li>Pay the subscription (Orange Money / MyZaka / bank transfer) and contact the admin.</li>
     <li>Your account is activated and you get full access to CV tailoring and sending.</li>

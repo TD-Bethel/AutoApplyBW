@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Support inbox — AutoApply BW{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('admin.index') }}">&larr; Back to admin</a></p>
+<h1>Support inbox</h1>
+<div class="card">
+  {% if threads %}
+  <table>
+    <thead><tr><th>User</th><th>Status</th><th>Last message</th><th>When</th><th></th></tr></thead>
+    <tbody>
+      {% for t in threads %}
+      <tr>
+        <td>{{ t['full_name'] or t['email'] }}<br><span class="muted" style="font-size:0.78rem">{{ t['email'] }}</span></td>
+        <td><span class="badge {{ t['status'] }}">{{ t['status'] }}</span></td>
+        <td class="muted">{{ t['last_message'][:70] }}{% if t['last_message']|length > 70 %}…{% endif %}</td>
+        <td class="muted" style="font-size:0.8rem">{{ t['last_at'][:16].replace('T', ' ') }}</td>
+        <td><a class="btn small secondary" href="{{ url_for('admin.support_thread', user_id=t['id']) }}">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No support conversations yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

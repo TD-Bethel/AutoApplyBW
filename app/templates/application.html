@@ -49,5 +49,16 @@
       </form>
     </div>
   {% endif %}
+
+  {% if app['tailored_cv'] or g.user['cv_text'] %}
+  <hr>
+  <div class="row" style="align-items:center">
+    <a class="btn secondary" href="{{ url_for('main.job_cv_pdf', app_id=app['id']) }}"
+       target="_blank" rel="noopener">Preview CV (PDF)</a>
+    <span class="muted" style="font-size:0.85rem">Opens the exact PDF the company will
+      receive{% if app['tailored_cv'] %} — save your edits first{% else %} (your base CV
+      until you tailor this application){% endif %}.</span>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

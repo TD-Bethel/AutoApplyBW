@@ -121,9 +121,81 @@ AutoApplyBW/
 
 ---
 
+## Find jobs (built-in job search)
+
+The dashboard's **Find jobs** card searches live company vacancy pages across
+Southern Africa (with a country picker: Botswana, Namibia, Zambia, South Africa)
+and turns results into one-click application drafts.
+
+**Botswana**
+- **Mascom** — `mascom.bw/vacancy-listings/` (HTML vacancy table; expired adverts filtered out)
+- **BTC** — `btc.bw` job openings (WordPress JSON API, no HTML scraping)
+- **BPC** — `careers.bpc.bw` (SAP SuccessFactors)
+- **Chobe Holdings** — `chobeholdings.co.bw` (vacancy links, safari camps/lodges)
+- **Botswana Stock Exchange** — `bse.co.bw/vacancies/` (vacancy notice PDFs)
+
+**Namibia**
+- **Telecom Namibia** — `telecom.na/vacancies` (vacancy notice PDFs)
+- **NamPost** — `nampost.com.na/corporate/vacancies` (vacancy headings)
+
+**South Africa**
+- **Capitec Bank** — `careers.capitecbank.co.za` (SAP SuccessFactors)
+- **Discovery** — `careers.discovery.co.za` (SAP SuccessFactors)
+- **Nedbank** — `jobs.nedbank.co.za` (SAP SuccessFactors)
+
+**Zimbabwe**
+- **Delta Corporation** — `delta.co.zw/vacancies/` (vacancy notice PDFs)
+
+The scraper (`app/services/scraper.py`) is stdlib-only, honours `robots.txt`,
+caches each source for 10 minutes, fetches sources in parallel, interleaves
+sources fairly in unranked results, and never breaks the dashboard if a source
+is down. Results are reviewed by the user — the application email is confirmed
+by a human before anything is sent. New sources are **config-only**:
+SuccessFactors portals go in `_SF_SOURCES`, simple careers pages (vacancy
+links, PDFs, or headings) in `_SCAN_SOURCES`, RSS/Atom feeds in `_RSS_SOURCES`.
+To discover more sources manually, this search works well:
+`(site:.co.bw OR site:.com.na OR site:.co.zm OR site:.co.za) ("careers" OR "vacancies")`.
+
+### Source survey (June 2026)
+
+Other employers checked, for future adapters:
+
+- **Careers page exists, no openings right now** (recheck periodically; some may
+  work with `_SCAN_SOURCES` once their listing markup is visible): Bomaid, CEDA,
+  LEA, BOCRA, BoFiNet, Letshego, Air Botswana, Botswana Railways, Bank of
+  Botswana, BIHL, Minet, Debswana, First Capital, Choppies
+  (`jobs.choppies.co.bw`), Cresta Marakanelo, Bank Gaborone, Namdeb,
+  Debmarine, Namibia Wildlife Resorts, Sefalana.
+- **Behind an ATS / JS app that can't be scraped simply**: FNB (Workday),
+  Stanbic / Standard Chartered / Access Bank (group-level portals), Botswana
+  Life + NamWater + Woolworths + Isuzu (eRecruit/Trending Talent), Botswana Oil
+  + Pep (MCI Direct Hire), De Beers (global list, no per-job location), BHC +
+  WUC + ZESCO (JavaScript apps without a discoverable public API), Eskom
+  (custom portal), Sasol (SuccessFactors but renders jobs via JS), Shoprite +
+  Clicks + Spar + Ford + Truworths + Raubex + Aveng + Oceana (group portals/ATS
+  widgets), BMW + DSV + Investec + First Quantum (JS-rendered job lists).
+- **Site unreachable at survey time**: Orange BW, Khoemacau (broken SSL), BDC
+  (broken SSL), Engen, TotalEnergies BW, Turnstar, BotswanaPost, MTC Namibia,
+  Namib Mills, Zamtel, O&L Group, Zambia Sugar, CEC, NICO, Far Property,
+  RDC Properties, Courier Guy, Tiger Brands — plus, from the June 2026 SADC
+  sweep: most ZW/ZM/NA corporate sites (Namdeb, Rössing, NamPower, Namport,
+  Gondwana, TransNamib, ZCCM, KCM, Zanaco-careers, Econet, NetOne, OK Zimbabwe,
+  Meikles, Innscor, NRZ and others) refuse connections from non-browser
+  clients or are simply down.
+- **Careers info page but no machine-readable listings**: Zanaco, ZACL,
+  Zambeef, Mr Price, TFG, Sanlam, BITC, FSG, Minergy, Tlou Energy, NamPower
+  (recruitment portal has broken SSL).
+- **Facebook groups**: cannot be used — posts sit behind a login wall and
+  Facebook's terms prohibit automated collection.
+- **Automating the `site:` search formula**: search engines block automated
+  queries (and their terms prohibit it), so source discovery stays manual —
+  but each find is a one-line config entry.
+
+---
+
 ## Roadmap
 
 - Automated online payments (DPO Pay / Flutterwave / mobile money) instead of manual activation
-- A scraper / directory of Botswana company contacts
+- More job sources (Khoemacau and Orange BW careers pages were unreachable at build time; recheck)
 - PDF export of the tailored CV (instead of plain-text attachment)
 - Application tracking (replies, interview status)

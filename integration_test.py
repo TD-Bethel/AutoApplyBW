@@ -102,7 +102,7 @@ class _ClaudeMock(BaseHTTPRequestHandler):
         system = body.get("system", "")
         if "humanizing a job-application cover letter" in system or "Rewrite the text" in system:
             text = "Dear Hiring Manager, I am writing to apply. MOCK-HUMANIZED."
-        elif "Review the candidate's CV" in system.replace("\n", " "):
+        elif "Judge the candidate's CV" in system.replace("\n", " "):
             text = json.dumps({
                 "score": 82,
                 "strengths": ["Clear contact details", "Relevant retail experience"],

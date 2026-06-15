@@ -46,6 +46,33 @@ CREATE TABLE IF NOT EXISTS applications (
 );
 
 CREATE INDEX IF NOT EXISTS idx_apps_user ON applications(user_id);
+
+-- AI assistants: each (user, assistant) pair is an isolated conversation
+-- thread — its own context window, separate from every other assistant.
+CREATE TABLE IF NOT EXISTS assistant_messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    assistant  TEXT NOT NULL,                      -- 'cv_coach' | 'cover_letter' | 'interview'
+    role       TEXT NOT NULL,                      -- 'user' | 'assistant'
+    content    TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_assistant_msgs ON assistant_messages(user_id, assistant);
+
+-- Support chat: customers report payments / talk to the admin. 'bot' rows are
+-- the scripted auto-replies; 'admin' rows are real replies from the owner.
+CREATE TABLE IF NOT EXISTS support_messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    role       TEXT NOT NULL,                      -- 'user' | 'bot' | 'admin'
+    content    TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_support_user ON support_messages(user_id);
 """
 
 
@@ -60,6 +87,11 @@ def get_db():
         g.db = sqlite3.connect(path)
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
+        # WAL lets readers proceed while a write is in flight — the main
+        # concurrency ceiling for SQLite under multi-user load. busy_timeout
+        # makes brief write contention wait instead of erroring.
+        g.db.execute("PRAGMA journal_mode = WAL")
+        g.db.execute("PRAGMA busy_timeout = 5000")
     return g.db
 
 

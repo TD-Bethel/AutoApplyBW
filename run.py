@@ -14,7 +14,11 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     if "--serve" in sys.argv:
         from waitress import serve
-        print(f" * AutoApply BW running on http://{host}:{port} (waitress)")
-        serve(app, host=host, port=port)
+        # Requests spend most of their time waiting on I/O (AI calls, job
+        # sources, SMTP), so a generous thread count keeps the site responsive
+        # while slow requests are in flight. Override with WAITRESS_THREADS.
+        threads = int(os.getenv("WAITRESS_THREADS", "16"))
+        print(f" * AutoApply BW running on http://{host}:{port} (waitress, {threads} threads)")
+        serve(app, host=host, port=port, threads=threads)
     else:
-        app.run(host=host, port=port, debug=True)
+        app.run(host=host, port=port, debug=True, threaded=True)

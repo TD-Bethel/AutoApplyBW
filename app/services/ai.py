@@ -10,11 +10,15 @@ dependency footprint pure-Python.
 import json
 import os
 import re
+import time
 from pathlib import Path
 import requests
 from flask import current_app
 
+from . import cv_exemplar
+
 # Overridable so tests (or a proxy) can point at a different endpoint.
+# (The DeepSeek/OpenAI-compatible URL lives in app config: DEEPSEEK_API_URL.)
 API_URL = os.getenv("ANTHROPIC_API_URL", "https://api.anthropic.com/v1/messages")
 ANTHROPIC_VERSION = "2023-06-01"
 TIMEOUT = 90
@@ -22,30 +26,86 @@ TIMEOUT = 90
 
 # ----------------------------------------------------------------------------- helpers
 def _has_ai():
-    return bool(current_app.config.get("ANTHROPIC_API_KEY"))
+    return bool(current_app.config.get("ANTHROPIC_API_KEY")
+                or current_app.config.get("DEEPSEEK_API_KEY"))
+
+
+def provider_name():
+    """Which AI backend will answer: 'claude', 'deepseek', or 'rules'."""
+    if current_app.config.get("ANTHROPIC_API_KEY"):
+        return "claude"
+    if current_app.config.get("DEEPSEEK_API_KEY"):
+        return "deepseek"
+    return "rules"
 
 
 def _call_claude(system, user, max_tokens=2000):
-    key = current_app.config["ANTHROPIC_API_KEY"]
-    model = current_app.config["ANTHROPIC_MODEL"]
+    return _call_claude_chat(system, [{"role": "user", "content": user}], max_tokens)
+
+
+def _call_claude_chat(system, messages, max_tokens=2000):
+    """Send a full multi-turn conversation to whichever provider is configured.
+
+    The API is stateless — the caller supplies the whole history each time
+    (its own isolated context window). Anthropic is preferred; DeepSeek
+    (OpenAI-compatible wire format) is the fallback provider.
+    """
+    if current_app.config.get("ANTHROPIC_API_KEY"):
+        return _anthropic_chat(system, messages, max_tokens)
+    return _deepseek_chat(system, messages, max_tokens)
+
+
+def _anthropic_chat(system, messages, max_tokens):
     resp = requests.post(
         API_URL,
         headers={
-            "x-api-key": key,
+            "x-api-key": current_app.config["ANTHROPIC_API_KEY"],
             "anthropic-version": ANTHROPIC_VERSION,
             "content-type": "application/json",
         },
         json={
-            "model": model,
+            "model": current_app.config["ANTHROPIC_MODEL"],
             "max_tokens": max_tokens,
             "system": system,
-            "messages": [{"role": "user", "content": user}],
+            "messages": messages,
         },
         timeout=TIMEOUT,
     )
     resp.raise_for_status()
     data = resp.json()
     return "".join(block.get("text", "") for block in data.get("content", []))
+
+
+def _deepseek_chat(system, messages, max_tokens):
+    # OpenAI-compatible shape: system prompt rides as the first message.
+    # Free-tier providers behind the endpoint are queue-limited and return
+    # transient 429/5xx — retry once before giving up to the rules fallback.
+    last_exc = None
+    for attempt in range(2):
+        if attempt:
+            time.sleep(2)
+        resp = requests.post(
+            current_app.config["DEEPSEEK_API_URL"],
+            headers={
+                "Authorization": f"Bearer {current_app.config['DEEPSEEK_API_KEY']}",
+                "content-type": "application/json",
+            },
+            json={
+                "model": current_app.config["DEEPSEEK_MODEL"],
+                "max_tokens": max_tokens,
+                "messages": [{"role": "system", "content": system}] + list(messages),
+            },
+            timeout=TIMEOUT,
+        )
+        if resp.status_code in (429, 500, 502, 503, 529):
+            last_exc = requests.HTTPError(f"{resp.status_code} from AI endpoint", response=resp)
+            continue
+        resp.raise_for_status()
+        data = resp.json()
+        if "choices" not in data:  # error-shaped 200: surface the real message
+            raise RuntimeError(f"AI endpoint error: {str(data)[:200]}")
+        return data["choices"][0]["message"]["content"] or ""
+    raise last_exc
 
 
 def _extract_json(text):
@@ -90,6 +150,43 @@ def _light_clean(text):
     # Collapse the double spaces those edits can leave behind.
     text = re.sub(r"[ \t]{2,}", " ", text)
     return text.strip()
+
+
+# Bullet markers seen in real CVs: •, -, *, ·, ‣, ▪, Word's private-use , "o ".
+_BULLET_RE = re.compile(r"^\s*(?:[•\-\*·‣▪]+|o)\s+")
+
+
+def _debullet(text):
+    """Merge bulleted lines into prose paragraphs (the CV house format).
+
+    Consecutive bullet items become one paragraph: each item is turned into a
+    sentence (capitalised, full stop) and joined. Non-bullet lines pass through
+    untouched, so section headings and existing prose are preserved.
+    """
+    out, run = [], []
+
+    def flush():
+        if not run:
+            return
+        sentences = []
+        for item in run:
+            s = item.strip().rstrip(";,")
+            if s:
+                s = s[0].upper() + s[1:]
+                if s[-1] not in ".!?":
+                    s += "."
+                sentences.append(s)
+        out.append(" ".join(sentences))
+        run.clear()
+
+    for line in (text or "").split("\n"):
+        if _BULLET_RE.match(line):
+            run.append(_BULLET_RE.sub("", line))
+        else:
+            flush()
+            out.append(line)
+    flush()
+    return "\n".join(out)
 
 
 # ----------------------------------------------------------------------------- offline humanizer "algorithm"
@@ -302,7 +399,7 @@ def humanize_text(text):
             rewritten = _call_claude(
                 _humanize_system(),
                 f"Rewrite this so it does not read as AI-generated:\n\n{text}",
-                max_tokens=1500,
+                max_tokens=2500,
             ).strip()
             if rewritten:
                 return _light_clean(rewritten)
@@ -329,47 +426,36 @@ def review_cv(cv_text):
 
 def _review_cv_ai(cv_text):
     system = (
-        "You are an expert career advisor for the Botswana job market. Review the "
-        "candidate's CV and respond ONLY with a JSON object with keys: "
-        "score (integer 0-100), strengths (array of short strings), "
-        "issues (array of short, specific, actionable strings)."
+        "You are an expert career advisor for the Botswana job market. Judge the "
+        "candidate's CV against the gold standard below — reward a prose summary, "
+        "achievement bullets that start with action verbs, quantified results with "
+        "real numbers, and named tools/employers; mark down vague duties and clichés. "
+        "Do NOT require academic or student-specific items (e.g. a final-year project) "
+        "from candidates who are not students.\n\n"
+        + cv_exemplar.STYLE_GUIDE +
+        "\n\nGold-standard CV:\n<example_cv>\n" + cv_exemplar.EXEMPLAR_CV +
+        "\n</example_cv>\n\n"
+        "Respond ONLY with a JSON object with keys: score (integer 0-100), "
+        "strengths (array of short strings), issues (array of short, specific, "
+        "actionable strings)."
     )
-    raw = _call_claude(system, f"CV:\n\n{cv_text}", max_tokens=1200)
+    # Generous budget: free-tier reasoning models spend tokens thinking before
+    # answering; too small a cap truncates mid-reasoning and yields junk.
+    raw = _call_claude(system, f"CV:\n\n{cv_text}", max_tokens=2500)
     data = _extract_json(raw)
     return {
         "score": int(data.get("score", 0)),
         "strengths": list(data.get("strengths", []))[:8],
         "issues": list(data.get("issues", []))[:8],
-        "powered_by": "claude",
+        "powered_by": provider_name(),
     }
 
 
 def _review_cv_rules(cv_text):
-    text = cv_text.lower()
-    strengths, issues, score = [], [], 50
-    checks = {
-        "contact email": bool(re.search(r"[\w.\-]+@[\w.\-]+", cv_text)),
-        "phone number": bool(re.search(r"(\+?267)?\s?\d{7,8}", cv_text)),
-        "education section": any(k in text for k in ("education", "qualification", "degree", "diploma", "bgcse")),
-        "work experience": any(k in text for k in ("experience", "employment", "worked", "intern")),
-        "skills section": "skill" in text,
-        "references": "reference" in text,
-    }
-    for label, present in checks.items():
-        if present:
-            strengths.append(f"Has a {label}.")
-            score += 6
-        else:
-            issues.append(f"Add a clear {label}.")
-            score -= 6
-    word_count = len(cv_text.split())
-    if word_count < 150:
-        issues.append("CV looks short — add more detail about your achievements.")
-        score -= 5
-    elif word_count > 1200:
-        issues.append("CV is long — trim to 1–2 pages and keep the most relevant points.")
-        score -= 3
-    score = max(0, min(100, score))
+    # Offline path: score against the features learned from the gold-standard CV
+    # (quantified bullets, action verbs, named tools, structure) so the system
+    # applies the same standard even with no API key.
+    score, strengths, issues = cv_exemplar.score_against_exemplar(cv_text)
     return {"score": score, "strengths": strengths, "issues": issues, "powered_by": "rules"}
 
 
@@ -388,11 +474,20 @@ def _tailor_ai(cv_text, full_name, job_title, company_name, job_description):
     system = (
         "You are an expert career advisor in Botswana. Given a candidate's CV and a "
         "job, produce a tailored CV and a tailored cover letter. Keep all facts truthful "
-        "to the CV — never invent qualifications or experience. Reorder and emphasise the "
-        "most relevant skills, and mirror keywords from the job description where the "
-        "candidate genuinely has them. Respond ONLY with a JSON object with keys "
-        "'tailored_cv' (string) and 'cover_letter' (string). The cover letter should be "
-        "professional, addressed to the company, about 3 short paragraphs."
+        "to the CV — never invent qualifications, experience, or numbers. Reorder and "
+        "emphasise the most relevant experience, and mirror keywords from the job "
+        "description where the candidate genuinely has them.\n\n"
+        + cv_exemplar.STYLE_GUIDE +
+        "\n\nHere is the gold-standard CV to imitate in structure and quality:\n"
+        "<example_cv>\n" + cv_exemplar.EXEMPLAR_CV + "\n</example_cv>\n\n"
+        "Now tailor the candidate's CV to the job, matching that example's structure "
+        "and bullet quality (action verbs, real numbers, named tools). Output plain "
+        "text only — ALL-CAPS section headings, '- ' bullets, no markdown or emojis. "
+        "Keep it concise enough to fit two A4 pages: at most 3-5 bullets per role, "
+        "lead with the most relevant experience, and drop weak or repetitive points.\n\n"
+        "Respond ONLY with a JSON object with keys 'tailored_cv' (string) and "
+        "'cover_letter' (string). The cover letter should be professional, addressed to "
+        "the company, about three short paragraphs."
     )
     user = (
         f"Candidate name: {full_name}\n"
@@ -401,17 +496,28 @@ def _tailor_ai(cv_text, full_name, job_title, company_name, job_description):
         f"Job description:\n{job_description}\n\n"
         f"Candidate CV:\n{cv_text}"
     )
-    raw = _call_claude(system, user, max_tokens=3000)
+    raw = _call_claude(system, user, max_tokens=6000)
     data = _extract_json(raw)
-    # Humanize the cover letter (prose) through the humanizer pass; light-clean the
-    # CV so its structure stays intact but typography/filler is still cleaned up.
     cover_letter = humanize_text(data.get("cover_letter", "").strip())
-    tailored_cv = _light_clean(data.get("tailored_cv", "").strip())
+    # Light-clean only: keep the exemplar-style bullets and headings intact,
+    # just strip stray markdown/typography the model may add.
+    tailored_cv = _normalize_cv(_light_clean(data.get("tailored_cv", "").strip()))
     return {
         "tailored_cv": tailored_cv,
         "cover_letter": cover_letter,
-        "powered_by": "claude",
+        "powered_by": provider_name(),
     }
+
+
+def _normalize_cv(text):
+    """Tidy AI/CV output to the exemplar's plain-text conventions without
+    destroying its structure: strip markdown bold, normalise bullet markers to
+    '- ', drop emojis (handled by _light_clean), collapse blank runs."""
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)       # **bold** -> bold
+    text = re.sub(r"(?m)^\s*[•*]\s+", "- ", text)         # • / * bullets -> -
+    text = re.sub(r"(?m)^\s*[-]\s+", "- ", text)          # normalise '- ' spacing
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 def _tailor_rules(cv_text, full_name, job_title, company_name, job_description):
@@ -432,7 +538,8 @@ def _tailor_rules(cv_text, full_name, job_title, company_name, job_description):
         f"Thank you for your time and consideration.\n\n"
         f"Yours sincerely,\n{full_name}"
     )
-    return {"tailored_cv": _light_clean(cv_text), "cover_letter": humanize_text(cover_letter),
+    return {"tailored_cv": _normalize_cv(_light_clean(cv_text)),
+            "cover_letter": humanize_text(cover_letter),
             "powered_by": "rules"}
 
 

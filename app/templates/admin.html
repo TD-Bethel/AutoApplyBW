@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Admin — AutoApply BW{% endblock %}
 {% block content %}
-<h1>Admin panel</h1>
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.8rem">
+  <h1 style="margin:0">Admin panel</h1>
+  <a class="btn secondary" href="{{ url_for('admin.support_inbox') }}">
+    Support inbox{% if support_threads %} ({{ support_threads }}){% endif %}
+  </a>
+</div>
 <div class="row">
   <div class="card"><span class="muted">Total users</span><div class="score">{{ stats.total }}</div></div>
   <div class="card"><span class="muted">Active</span><div class="score good">{{ stats.active }}</div></div>
@@ -12,7 +17,7 @@
   <h2>Users</h2>
   <table>
     <thead>
-      <tr><th>Name / Email</th><th>Phone</th><th>Status</th><th>Expires</th><th>Apps</th><th>Manage</th></tr>
+      <tr><th>Name / Email</th><th>Phone</th><th>Status</th><th>Expires</th><th>Apps</th><th>CV</th><th>Manage</th></tr>
     </thead>
     <tbody>
       {% for u in users %}
@@ -23,6 +28,11 @@
         <td><span class="badge {{ u['status'] }}">{{ u['status'] }}</span></td>
         <td>{{ u['access_expires'] or '—' }}</td>
         <td>{{ u['sent_count'] }}/{{ u['app_count'] }} sent</td>
+        <td>
+          {% if u['cv_filename'] or u['cv_text'] %}
+            <a class="btn small secondary" href="{{ url_for('admin.view_cv', user_id=u['id']) }}">View CV</a>
+          {% else %}<span class="muted">none</span>{% endif %}
+        </td>
         <td>
           {% if u['role'] != 'admin' %}
           <form method="post" action="{{ url_for('admin.activate', user_id=u['id']) }}" style="display:flex;gap:0.3rem;align-items:center;margin-bottom:0.3rem">

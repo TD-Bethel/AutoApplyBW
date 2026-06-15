@@ -38,6 +38,12 @@ def create_app():
         DATABASE_PATH=os.getenv("DATABASE_PATH", "instance/autoapply.db"),
         ANTHROPIC_API_KEY=os.getenv("ANTHROPIC_API_KEY", "").strip(),
         ANTHROPIC_MODEL=os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8").strip(),
+        DEEPSEEK_API_KEY=os.getenv("DEEPSEEK_API_KEY", "").strip(),
+        DEEPSEEK_MODEL=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash").strip(),
+        # Any OpenAI-compatible endpoint works here (DeepSeek, a local
+        # FreeLLMAPI aggregator, LM Studio, ...).
+        DEEPSEEK_API_URL=os.getenv("DEEPSEEK_API_URL",
+                                   "https://api.deepseek.com/chat/completions").strip(),
         SMTP_HOST=os.getenv("SMTP_HOST", "").strip(),
         SMTP_PORT=_int_env("SMTP_PORT", 587),
         SMTP_USER=os.getenv("SMTP_USER", "").strip(),
@@ -74,10 +80,14 @@ def create_app():
     from .auth import bp as auth_bp
     from .main import bp as main_bp
     from .admin import bp as admin_bp
+    from .assistants import bp as assistants_bp
+    from .support import bp as support_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(assistants_bp)
+    app.register_blueprint(support_bp)
 
     with app.app_context():
         db.init_db()

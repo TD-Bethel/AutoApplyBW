@@ -75,9 +75,16 @@ flowchart TD
 5. **Two external dependencies, both owner-controlled.** The Anthropic API (one key
    for all users) and each user's own SMTP inbox for sending (rate-limited per hour).
 
-## Where the capacity limits live
+## Where the capacity limits live (and the mitigations in place)
 
-- **waitress 4 threads** → ~4 truly-concurrent requests.
-- **SQLite single-writer** → write contention is the main ceiling under load.
-- **Blocking Claude calls** (AI mode) hold a thread for seconds.
+- **waitress threads**: 16 by default (`WAITRESS_THREADS` to override) — requests
+  are mostly I/O-bound waits, so this is cheap headroom over the old 4.
+- **SQLite**: WAL mode + busy_timeout (app/db.py) — readers no longer block
+  behind a writer; brief write contention waits instead of erroring.
+- **Job search**: served from a per-source cache with a stampede lock; after the
+  first search, a background thread re-fetches sources just before the 10-min
+  TTL expires, so user searches never hold a request thread for a cold fetch.
+- **Blocking AI calls** still hold a thread for seconds-to-a-minute — the main
+  remaining ceiling. Mitigated by the thread count; a queue/worker model is the
+  next step if AI traffic grows.
 - **SMTP per-user daily caps** (Gmail ~500/day) — but this scales *with* users.

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ assistant.name }} — AutoApply BW{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
+  <h1 style="margin:0">{{ assistant.name }}</h1>
+  <div style="display:flex;gap:0.5rem;align-items:center">
+    <a class="btn small secondary" href="{{ url_for('assistants.index') }}">All assistants</a>
+    {% if thread %}
+    <form method="post" action="{{ url_for('assistants.clear', assistant=assistant_key) }}"
+          data-confirm="Clear this conversation? This assistant will forget everything discussed here.">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button class="btn small secondary" type="submit">Clear conversation</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+<p class="muted">{{ assistant.tagline }} This conversation is private to this assistant.</p>
+
+<div class="card chat-box" id="chat-box">
+  {% if not thread %}
+    <p class="muted" style="text-align:center;padding:1.5rem 0">
+      No messages yet — say hello and tell {{ assistant.name }} what you need.
+    </p>
+  {% endif %}
+  {% for m in thread %}
+    <div class="chat-msg {{ m['role'] }}">
+      <div class="chat-bubble">{{ m['content'] }}</div>
+    </div>
+  {% endfor %}
+</div>
+
+<form method="post" action="{{ url_for('assistants.send', assistant=assistant_key) }}" class="chat-form">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <textarea name="message" rows="2" required maxlength="4000"
+            placeholder="Message {{ assistant.name }}…"></textarea>
+  <button class="btn" type="submit">Send</button>
+</form>
+
+{% endblock %}

@@ -6,12 +6,13 @@
   <title>{% block title %}AutoApply BW{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
+<body class="{{ 'bg-app' if g.user else 'bg-auth' }}">
   <header class="topbar">
     <a class="brand" href="{{ url_for('main.index') }}">AutoApply&nbsp;<span>BW</span></a>
     <nav>
       {% if g.user %}
         <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('assistants.index') }}">Career Team</a>
         <a href="{{ url_for('main.settings') }}">Settings</a>
         {% if g.user['role'] == 'admin' %}<a href="{{ url_for('admin.index') }}">Admin</a>{% endif %}
         <span class="who">{{ g.user['full_name'] or g.user['email'] }}</span>
@@ -37,7 +38,36 @@
 
   <footer class="footer">
     <p>AutoApply BW — helping Batswana youth apply smarter. &copy; {{ 2026 }}</p>
+    <p class="credits">Background photos: Diego Delso (CC BY-SA 4.0) &middot;
+      Temptious (CC0) &middot; via Wikimedia Commons</p>
   </footer>
+
+  {% if g.user and g.user['role'] != 'admin' %}
+  {# Floating support chat: report a payment / talk to the admin #}
+  <button id="chat-fab" type="button" aria-label="Chat with support"
+          data-csrf="{{ csrf_token() }}"
+          data-messages-url="{{ url_for('support.messages') }}"
+          data-send-url="{{ url_for('support.send') }}">
+    <svg viewBox="0 0 48 48" width="30" height="30" aria-hidden="true">
+      <path d="M24 6C13 6 4 13.6 4 23c0 5.3 2.9 10 7.5 13.1-.3 2.5-1.3 4.7-3 6.4 3.4-.2 6.5-1.4 9-3.3 2.1.5 4.3.8 6.5.8 11 0 20-7.6 20-17S35 6 24 6z" fill="#fff"/>
+      <circle cx="16" cy="23" r="2.6" fill="#0071e3"/>
+      <circle cx="24" cy="23" r="2.6" fill="#0071e3"/>
+      <circle cx="32" cy="23" r="2.6" fill="#0071e3"/>
+    </svg>
+  </button>
+  <div id="chat-panel" hidden>
+    <div class="chat-head">
+      <strong>AutoApply BW support</strong>
+      <button id="chat-close" type="button" aria-label="Close chat">&times;</button>
+    </div>
+    <div class="chat-thread" id="chat-thread"></div>
+    <div class="chat-quick" id="chat-quick"></div>
+    <form id="chat-send-form" autocomplete="off">
+      <input id="chat-text" maxlength="1000" placeholder="Type a message for the admin…">
+      <button class="btn small" type="submit">Send</button>
+    </form>
+  </div>
+  {% endif %}
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

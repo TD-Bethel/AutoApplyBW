@@ -1,13 +1,14 @@
 """Core user-facing routes: dashboard, CV, job applications, settings."""
 from datetime import datetime, timezone, timedelta
 from flask import (
-    Blueprint, render_template, request, redirect, url_for, flash, g, current_app, abort
+    Blueprint, render_template, request, redirect, url_for, flash, g, current_app,
+    abort, Response
 )
 
 from .auth import login_required, active_required, access_active
 from .db import query, execute, now_iso
 from .security import valid_email
-from .services import cv_parser, ai, pdf
+from .services import cv_parser, ai, pdf, scraper
 from .services.emailer import send_application, EmailError
 
 MAX_CV_CHARS = 200_000      # caps pathological uploads (e.g. zip-bombed DOCX)
@@ -17,6 +18,12 @@ MAX_FIELD = 200
 bp = Blueprint("main", __name__)
 
 
+@bp.app_context_processor
+def _inject_countries():
+    # The Find-jobs form (dashboard) always needs the country list.
+    return {"countries": scraper.COUNTRIES}
+
+
 @bp.route("/")
 def index():
     if g.user:
@@ -24,20 +31,29 @@ def index():
     return render_template("index.html")
 
 
-@bp.route("/dashboard")
-@login_required
-def dashboard():
-    apps = query(
-        "SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC",
-        (g.user["id"],),
-    )
-    return render_template(
-        "dashboard.html",
-        apps=apps,
+def _dashboard_context(**extra):
+    """Shared template context for every route that renders dashboard.html —
+    one place to keep them in sync."""
+    ctx = dict(
+        apps=query(
+            "SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC",
+            (g.user["id"],),
+        ),
         is_active=access_active(g.user),
         sent_last_hour=_sent_last_hour(g.user["id"]),
         rate_limit=current_app.config["SEND_RATE_PER_HOUR"],
+        # Cache-only read: never blocks the page. warm_async() fills it.
+        vacancy_overview=scraper.overview(),
     )
+    ctx.update(extra)
+    return ctx
+
+
+@bp.route("/dashboard")
+@login_required
+def dashboard():
+    scraper.warm_async()  # fill the vacancy cache in the background
+    return render_template("dashboard.html", **_dashboard_context())
 
 
 # ------------------------------------------------------------------ CV upload + review
@@ -66,18 +82,7 @@ def cv_upload():
 def cv_review():
     user = query("SELECT * FROM users WHERE id = ?", (g.user["id"],), one=True)
     result = ai.review_cv(user["cv_text"])
-    apps = query(
-        "SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC",
-        (g.user["id"],),
-    )
-    return render_template(
-        "dashboard.html",
-        apps=apps,
-        is_active=True,
-        review=result,
-        sent_last_hour=_sent_last_hour(g.user["id"]),
-        rate_limit=current_app.config["SEND_RATE_PER_HOUR"],
-    )
+    return render_template("dashboard.html", **_dashboard_context(review=result))
 
 
 # ------------------------------------------------------------------ job applications
@@ -99,6 +104,30 @@ def job_add():
     )
     flash(f"Added application for {company or email}.", "success")
     return redirect(url_for("main.dashboard"))
+
+
+@bp.route("/jobs/find", methods=["POST"])
+@active_required
+def job_find():
+    keywords = request.form.get("keywords", "").strip()[:MAX_FIELD]
+    location = request.form.get("location", "").strip()[:MAX_FIELD]
+    country = request.form.get("country", "").strip()
+    if country not in scraper.COUNTRIES:
+        country = ""  # "" = all countries
+    try:
+        listings = scraper.search(keywords=keywords, location=location, country=country)
+    except Exception:  # noqa: BLE001 — search must never 500 the dashboard
+        current_app.logger.exception("Job search failed")
+        listings = []
+        flash("Job search is unavailable right now. Please try again later.", "warning")
+    if not listings and keywords:
+        flash("No matching jobs found. Try fewer or different keywords.", "info")
+    return render_template("dashboard.html", **_dashboard_context(
+        found=listings,
+        find_keywords=keywords,
+        find_location=location,
+        find_country=country,
+    ))
 
 
 def _owned_app(app_id):
@@ -147,6 +176,23 @@ def job_edit(app_id):
     return redirect(url_for("main.job_view", app_id=app_id))
 
 
+@bp.route("/jobs/<int:app_id>/cv.pdf")
+@active_required
+def job_cv_pdf(app_id):
+    """Inline preview of the exact PDF that will be attached when sending."""
+    app = _owned_app(app_id)
+    user = query("SELECT * FROM users WHERE id = ?", (g.user["id"],), one=True)
+    if not (app["tailored_cv"] or user["cv_text"]).strip():
+        flash("Upload your CV (or tailor this application) before previewing the PDF.", "warning")
+        return redirect(url_for("main.job_view", app_id=app_id))
+    cv_bytes, cv_name = _cv_pdf(user, app)
+    resp = Response(cv_bytes, mimetype="application/pdf")
+    safe_name = cv_name.replace('"', "").replace("\r", "").replace("\n", "")
+    resp.headers["Content-Disposition"] = f'inline; filename="{safe_name}"'
+    resp.headers["Cache-Control"] = "no-store"  # always re-render the latest CV
+    return resp
+
+
 @bp.route("/jobs/<int:app_id>/send", methods=["POST"])
 @active_required
 def job_send(app_id):
@@ -187,6 +233,15 @@ def job_delete(app_id):
 
 
 # ------------------------------------------------------------------ sending helpers
+def _cv_pdf(user, app):
+    """Build the CV PDF for an application — used by both preview and send,
+    so what the user previews is byte-for-byte what the company receives."""
+    cv_content = app["tailored_cv"] or user["cv_text"]
+    contact = " | ".join(p for p in (user["smtp_user"], user["phone"]) if p)
+    cv_bytes = pdf.build_pdf(user["full_name"], cv_content, contact_line=contact)
+    return cv_bytes, f"CV - {user['full_name']}.pdf"
+
+
 def _sent_last_hour(user_id):
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
     row = query(
@@ -206,10 +261,7 @@ def _send_one(app):
         f"Application: {app['job_title']}" if app["job_title"]
         else f"Job application from {user['full_name']}"
     )
-    cv_content = app["tailored_cv"] or user["cv_text"]
-    contact = " | ".join(p for p in (user["smtp_user"], user["phone"]) if p)
-    cv_bytes = pdf.build_pdf(user["full_name"], cv_content, contact_line=contact)
-    cv_name = f"CV - {user['full_name']}.pdf"
+    cv_bytes, cv_name = _cv_pdf(user, app)
 
     try:
         send_application(

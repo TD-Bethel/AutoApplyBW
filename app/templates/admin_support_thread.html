@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Support — {{ u['email'] }} — AutoApply BW{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('admin.support_inbox') }}">&larr; Back to inbox</a></p>
+<h1>{{ u['full_name'] or u['email'] }}</h1>
+<p class="muted">{{ u['email'] }} · <span class="badge {{ u['status'] }}">{{ u['status'] }}</span>
+  {% if u['status'] != 'active' %}
+  &nbsp;<a class="btn small" href="{{ url_for('admin.index') }}">Activate from admin panel</a>
+  {% endif %}
+</p>
+
+<div class="card chat-box" id="chat-box">
+  {% for m in thread %}
+  <div class="chat-msg {{ 'user' if m['role'] == 'admin' else 'assistant' }}">
+    <div class="chat-bubble">
+      <span class="muted" style="font-size:0.7rem;display:block">
+        {{ {'user': 'Customer', 'bot': 'Auto-reply', 'admin': 'You'}[m['role']] }} ·
+        {{ m['created_at'][:16].replace('T', ' ') }}</span>
+      {{- m['content'] }}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<form method="post" class="chat-form">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <textarea name="message" rows="2" required maxlength="1000"
+            placeholder="Reply to {{ u['full_name'] or 'this user' }}…"></textarea>
+  <button class="btn" type="submit">Send reply</button>
+</form>
+{% endblock %}

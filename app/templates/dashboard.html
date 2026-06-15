@@ -54,9 +54,93 @@
   {% endif %}
 </div>
 
-{# ---------------- Add job ---------------- #}
+{# ---------------- Find jobs ---------------- #}
 <div class="card">
-  <h2>2. Add a job to apply for</h2>
+  <h2>2. Find jobs</h2>
+  <p class="muted">Searches live company vacancy pages across Southern Africa for current
+    openings. Add any result to your applications below — fill in the application
+    email from the advert if it isn't detected automatically.</p>
+  <form method="post" action="{{ url_for('main.job_find') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="row">
+      <div><label for="keywords">Keywords</label>
+      <input id="keywords" name="keywords" value="{{ find_keywords or '' }}"
+             placeholder="e.g. finance graduate, nurse, developer"></div>
+      <div><label for="location">Location (optional)</label>
+      <input id="location" name="location" value="{{ find_location or '' }}"
+             placeholder="e.g. Gaborone"></div>
+      <div><label for="country">Country</label>
+      <select id="country" name="country">
+        <option value="" {{ 'selected' if not find_country }}>All countries</option>
+        {% for code, cname in countries.items() %}
+          <option value="{{ code }}" {{ 'selected' if find_country == code }}>{{ cname }}</option>
+        {% endfor %}
+      </select></div>
+    </div>
+    <button class="btn" type="submit" style="margin-top:0.75rem" {{ '' if is_active else 'disabled' }}>Search jobs</button>
+  </form>
+
+  {% if vacancy_overview %}
+    <hr>
+    <h3 class="overview-title">Currently available</h3>
+    <div class="vacancy-overview">
+      {% for code, cname in countries.items() if vacancy_overview.get(code) %}
+      <div class="vacancy-col">
+        <h4>{{ cname }}</h4>
+        <ul>
+          {% for j in vacancy_overview[code] %}
+          <li>
+            {% if j.url %}
+              <a href="{{ j.url }}" target="_blank" rel="noopener noreferrer">{{ j.job_title }}</a>
+            {% else %}
+              {{ j.job_title }}
+            {% endif %}
+            <span class="muted">{{ j.company_name }}{% if j.posted %} · closes {{ j.posted }}{% else %} · closing date in advert{% endif %}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+  {% elif vacancy_overview is defined %}
+    <hr>
+    <p class="muted">Fetching the latest vacancies in the background — refresh this page in a moment.</p>
+  {% endif %}
+
+  {% if found is defined %}
+    <hr>
+    {% if found %}
+      <p class="muted">{{ found|length }} result(s). Click <strong>Select</strong> on a job
+        and it fills the form in section 3 below — review it, add the application
+        email if it wasn't detected, then click <strong>Add application</strong>.</p>
+      {% for j in found %}
+      <div class="found-job">
+        <strong>{{ j.job_title }}</strong>
+        {% if j.company_name %}<span class="muted"> — {{ j.company_name }}</span>{% endif %}
+        {% if j.location %}<span class="badge">{{ j.location }}</span>{% endif %}
+        {% if j.country and countries.get(j.country) %}<span class="badge">{{ countries[j.country] }}</span>{% endif %}
+        <p class="muted tight">{{ j.job_description[:240] }}{% if j.job_description|length > 240 %}…{% endif %}</p>
+        <div class="row" style="align-items:center">
+          {% if j.url %}<a href="{{ j.url }}" target="_blank" rel="noopener noreferrer">View advert</a>{% endif %}
+          <button class="btn small select-job" type="button"
+                  data-company="{{ j.company_name }}"
+                  data-email="{{ j.company_email }}"
+                  data-title="{{ j.job_title }}"
+                  data-desc="{{ j.job_description }}{% if j.url %}
+
+Advert: {{ j.url }}{% endif %}">Select</button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">No results. Try different keywords.</p>
+    {% endif %}
+  {% endif %}
+</div>
+
+{# ---------------- Add job ---------------- #}
+<div class="card" id="add-job-card">
+  <h2>3. Add a job to apply for</h2>
   <form method="post" action="{{ url_for('main.job_add') }}">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="row">
@@ -76,7 +160,7 @@
 {# ---------------- Applications list ---------------- #}
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center">
-    <h2 style="margin:0">3. Your applications</h2>
+    <h2 style="margin:0">4. Your applications</h2>
     {% if apps %}
     <form method="post" action="{{ url_for('main.job_send_all') }}" data-confirm="Send all tailored/draft applications now?">
       <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
