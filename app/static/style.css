@@ -1,14 +1,14 @@
 /* AutoApply BW — bright glass / Apple-style UI
    Light, frosted, generous radii, soft depth. All original class names kept. */
 :root {
-  --ink: #1d1d1f;          /* Apple near-black text */
-  --muted: #6e6e73;        /* secondary text */
-  --accent: #0071e3;       /* Apple blue */
-  --accent-dark: #0060c0;
-  --good: #1f9d55;
-  --warn: #c77700;
-  --bad: #d70015;
-  --line: rgba(0, 0, 0, 0.08);
+  --ink: #1a1a1c;          /* near-black text (slightly darker for contrast) */
+  --muted: #54545a;        /* secondary text (darkened from #6e6e73 for WCAG AA) */
+  --accent: #005fce;       /* blue (darkened from #0071e3 for stronger contrast) */
+  --accent-dark: #004ba8;
+  --good: #167c43;
+  --warn: #a8650a;
+  --bad: #c20012;
+  --line: rgba(0, 0, 0, 0.12);
 
   /* Glass surfaces */
   --glass: rgba(255, 255, 255, 0.65);
@@ -180,6 +180,16 @@ ul.tight { margin: 0.4rem 0; padding-left: 1.2rem; }
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }
 .notice .pay-numbers { margin: 0.6rem 0 0; }
+.notice-trial {
+  background: rgba(219, 234, 254, 0.85);
+  border-color: rgba(0, 95, 206, 0.35);
+}
+html[data-theme="dark"] .notice {
+  background: rgba(60, 50, 20, 0.5); border-color: rgba(253, 230, 138, 0.3);
+}
+html[data-theme="dark"] .notice-trial {
+  background: rgba(20, 40, 70, 0.55); border-color: rgba(74, 158, 255, 0.4);
+}
 
 /* Respect users who prefer less motion */
 @media (prefers-reduced-motion: reduce) {
@@ -492,3 +502,67 @@ body.bg-auth .hero-copy {
   padding: 0.2rem 0.4rem;
 }
 .pw-toggle:hover { color: var(--accent-dark); text-decoration: underline; }
+
+/* ======================================================= DARK MODE ======= */
+.theme-toggle {
+  background: rgba(0, 0, 0, 0.06); border: 1px solid var(--line);
+  color: var(--muted); font-size: 0.8rem; font-weight: 600;
+  padding: 0.3rem 0.7rem; border-radius: 980px; cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.theme-toggle:hover { color: var(--ink); }
+
+html[data-theme="dark"] {
+  --ink: #eceef3;
+  --muted: #9a9da8;
+  --accent: #4a9eff;
+  --accent-dark: #6cb0ff;
+  --line: rgba(255, 255, 255, 0.12);
+  --glass: rgba(32, 34, 42, 0.74);
+  --glass-strong: rgba(32, 34, 42, 0.9);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(900px 500px at 12% -8%, rgba(74, 158, 255, 0.10), transparent 60%),
+    radial-gradient(800px 520px at 100% 0%, rgba(175, 82, 222, 0.08), transparent 55%),
+    #0f1014;
+}
+html[data-theme="dark"] body.bg-auth {
+  background:
+    linear-gradient(rgba(15, 16, 20, 0.60), rgba(15, 16, 20, 0.78)),
+    url("img/okavango.jpg") center / cover no-repeat fixed;
+}
+html[data-theme="dark"] body.bg-app {
+  background:
+    linear-gradient(rgba(15, 16, 20, 0.78), rgba(15, 16, 20, 0.88)),
+    url("img/setswana.jpg") center / cover no-repeat fixed;
+}
+html[data-theme="dark"] .topbar { background: rgba(18, 19, 24, 0.82); }
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  background: rgba(255, 255, 255, 0.06); color: var(--ink);
+}
+html[data-theme="dark"] .btn.secondary { background: rgba(255, 255, 255, 0.09); color: var(--ink); }
+html[data-theme="dark"] .theme-toggle { background: rgba(255, 255, 255, 0.08); }
+html[data-theme="dark"] .found-job,
+html[data-theme="dark"] #chat-panel,
+html[data-theme="dark"] body.bg-auth .card, html[data-theme="dark"] body.bg-app .card,
+html[data-theme="dark"] body.bg-auth .feature, html[data-theme="dark"] body.bg-app .feature {
+  background: rgba(32, 34, 42, 0.92);
+}
+html[data-theme="dark"] .badge.draft { background: rgba(255, 255, 255, 0.1); color: #c7c9d2; }
+html[data-theme="dark"] .chat-bubble.from-admin { background: rgba(31, 157, 85, 0.25); }
+html[data-theme="dark"] .chat-msg.assistant .chat-bubble { background: rgba(255, 255, 255, 0.1); }
+
+/* ----------------------------------------------- contrast + responsive images */
+/* Any content image scales to its container and never overflows small screens. */
+img { max-width: 100%; height: auto; }
+/* Stronger card edges so panels are clearly delineated on bright backgrounds. */
+.card { border-color: rgba(0, 0, 0, 0.10); }
+/* Muted text needs to stay legible; bump weight slightly on small print. */
+.muted { color: var(--muted); }
+.caption-credit { opacity: 0.85; }

@@ -47,7 +47,7 @@ r = client.post("/register", data={
     "_csrf": tok, "email": "user@test.local", "password": "password123",
     "full_name": "Test User", "phone": "+267 71 000 000",
 }, follow_redirects=True)
-check("register succeeds", r.status_code == 200 and b"pending activation" in r.data)
+check("register succeeds", r.status_code == 200 and b"free trial" in r.data)
 
 # --- bad email rejected
 tok = get_csrf("/register")
@@ -75,10 +75,10 @@ r = client.post("/login?next=https://evil.example.com",
 check("open redirect blocked", "evil.example.com" not in r.headers.get("Location", ""),
       r.headers.get("Location", ""))
 
-# --- pending user blocked from paid features
+# --- new user is on a free trial and CAN use key features (not blocked)
 r = client.post("/jobs/add", data={"_csrf": get_csrf("/dashboard"), "company_email": "hr@x.co.bw"},
                 follow_redirects=True)
-check("pending user blocked from paid features", b"not active yet" in r.data)
+check("trial user can use features", b"Added application" in r.data)
 
 # --- settings: bad port doesn't crash; password change works
 r = client.post("/settings", data={"_csrf": get_csrf("/settings"), "full_name": "Test User",

@@ -171,3 +171,25 @@ document.addEventListener("click", function (event) {
     })(fields[i]);
   }
 })();
+
+// ----------------------------------------------------------------- dark mode
+(function () {
+  var btn = document.getElementById("theme-toggle");
+  if (!btn) return;
+  function sync() {
+    var dark = document.documentElement.getAttribute("data-theme") === "dark";
+    btn.textContent = dark ? "Light" : "Dark";
+  }
+  sync();
+  btn.addEventListener("click", function () {
+    var dark = document.documentElement.getAttribute("data-theme") === "dark";
+    if (dark) {
+      document.documentElement.removeAttribute("data-theme");
+      try { localStorage.setItem("theme", "light"); } catch (e) {}
+    } else {
+      document.documentElement.setAttribute("data-theme", "dark");
+      try { localStorage.setItem("theme", "dark"); } catch (e) {}
+    }
+    sync();
+  });
+})();

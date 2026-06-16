@@ -52,7 +52,7 @@ def attach_user():
 
 
 def access_active(user):
-    """True if the user may use paid features right now."""
+    """True if the user has a PAID, non-expired subscription right now."""
     if user is None or user["status"] != "active":
         return False
     if user["access_expires"]:
@@ -62,6 +62,51 @@ def access_active(user):
         except ValueError:
             return False  # unparseable expiry = no access, never silent unlimited
     return True
+
+
+# ------------------------------------------------------------------ free trial
+# New (unpaid) users get a limited trial: whichever of these comes first ends it.
+TRIAL_EMAILS = 2
+TRIAL_UPLOADS = 3
+TRIAL_DAYS = 7
+
+
+def _sent_count(user_id):
+    row = query("SELECT COUNT(*) AS c FROM applications WHERE user_id = ? AND status = 'sent'",
+                (user_id,), one=True)
+    return row["c"] if row else 0
+
+
+def trial_state(user):
+    """Trial usage for an unpaid user. Returns a dict with what's left and
+    whether the trial is over, or None for paid/admin users."""
+    if user is None or user["role"] == "admin" or access_active(user):
+        return None
+    sent = _sent_count(user["id"])
+    uploads = user["cv_uploads"] or 0
+    try:
+        started = datetime.fromisoformat(user["created_at"])
+    except (ValueError, TypeError):
+        started = datetime.now(timezone.utc)
+    days_used = (datetime.now(timezone.utc) - started).days
+    over = (sent >= TRIAL_EMAILS or uploads >= TRIAL_UPLOADS or days_used >= TRIAL_DAYS)
+    return {
+        "emails_left": max(0, TRIAL_EMAILS - sent),
+        "uploads_left": max(0, TRIAL_UPLOADS - uploads),
+        "days_left": max(0, TRIAL_DAYS - days_used),
+        "over": over,
+    }
+
+
+def trial_active(user):
+    """True if an unpaid user is still inside their free trial."""
+    state = trial_state(user)
+    return bool(state) and not state["over"]
+
+
+def feature_access(user):
+    """May this user use the paid/key features right now? (paid OR in trial)."""
+    return access_active(user) or trial_active(user)
 
 
 def login_required(view):
@@ -75,12 +120,21 @@ def login_required(view):
 
 
 def active_required(view):
+    """Gate key actions: allow paid users and users still inside their free
+    trial; block (with an upgrade message) once the trial is used up."""
     @functools.wraps(view)
     def wrapped(*args, **kwargs):
         if g.user is None:
             return redirect(url_for("auth.login", next=request.path))
-        if not access_active(g.user):
-            flash("Your account is not active yet. Please complete payment to get access.", "warning")
+        if not feature_access(g.user):
+            state = trial_state(g.user)
+            if state and state["over"]:
+                flash("Your free trial has ended. Pay your subscription and contact "
+                      "the admin (or use the support chat) to unlock full access. "
+                      "You can still view your data.", "warning")
+            else:
+                flash("Your account is not active yet. Please complete payment to get access.",
+                      "warning")
             return redirect(url_for("main.dashboard"))
         return view(*args, **kwargs)
     return wrapped
@@ -123,7 +177,9 @@ def register():
                    VALUES (?, ?, ?, ?, 'user', 'pending', ?)""",
                 (email, generate_password_hash(password), full_name, phone, now_iso()),
             )
-            flash("Account created! It is pending activation. Pay and contact the admin to be activated.", "success")
+            flash("Account created! Your free trial is ready, log in to start. "
+                  "It includes 2 emails, 3 CV uploads, or 7 days, whichever comes first.",
+                  "success")
             return redirect(url_for("auth.login"))
     return render_template("register.html")
 

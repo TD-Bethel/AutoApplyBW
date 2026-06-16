@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
     smtp_user     TEXT NOT NULL DEFAULT '',
     smtp_password TEXT NOT NULL DEFAULT '',
     from_name     TEXT NOT NULL DEFAULT '',
+    cv_uploads    INTEGER NOT NULL DEFAULT 0,        -- free-trial upload counter
     created_at    TEXT NOT NULL
 );
 
@@ -115,9 +116,24 @@ def close_db(exc=None):
         db.close()
 
 
+# Columns added after the first release. Each is applied with ALTER TABLE on
+# existing databases (CREATE TABLE IF NOT EXISTS never alters an existing table).
+_MIGRATIONS = [
+    ("users", "cv_uploads", "INTEGER NOT NULL DEFAULT 0"),
+]
+
+
+def _migrate(db):
+    for table, column, decl in _MIGRATIONS:
+        cols = {r["name"] for r in db.execute(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
 def init_db():
     db = get_db()
     db.executescript(SCHEMA)
+    _migrate(db)
     db.commit()
 
 

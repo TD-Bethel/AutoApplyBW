@@ -5,7 +5,7 @@ from flask import (
     abort, Response
 )
 
-from .auth import login_required, active_required, access_active
+from .auth import login_required, active_required, access_active, feature_access, trial_state
 from .db import query, execute, now_iso
 from .security import valid_email
 from .services import cv_parser, ai, pdf, scraper
@@ -39,7 +39,9 @@ def _dashboard_context(**extra):
             "SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC",
             (g.user["id"],),
         ),
-        is_active=access_active(g.user),
+        # Trial users can use features too, so buttons stay enabled for them.
+        is_active=feature_access(g.user),
+        trial=trial_state(g.user),
         sent_last_hour=_sent_last_hour(g.user["id"]),
         rate_limit=current_app.config["SEND_RATE_PER_HOUR"],
         # Cache-only read: never blocks the page. warm_async() fills it.
@@ -70,7 +72,8 @@ def cv_upload():
         flash(str(exc), "danger")
         return redirect(url_for("main.dashboard"))
     execute(
-        "UPDATE users SET cv_text = ?, cv_filename = ? WHERE id = ?",
+        "UPDATE users SET cv_text = ?, cv_filename = ?, cv_uploads = cv_uploads + 1 "
+        "WHERE id = ?",
         (text[:MAX_CV_CHARS], file.filename[:MAX_FIELD], g.user["id"]),
     )
     flash("CV uploaded and read successfully.", "success")
@@ -158,14 +161,14 @@ def job_tailor(app_id):
 
 
 @bp.route("/jobs/<int:app_id>")
-@active_required
+@login_required  # viewing your own data stays available after the trial ends
 def job_view(app_id):
     app = _owned_app(app_id)
     return render_template("application.html", app=app)
 
 
 @bp.route("/jobs/<int:app_id>/edit", methods=["POST"])
-@active_required
+@login_required  # editing existing data is allowed after the trial ends
 def job_edit(app_id):
     _owned_app(app_id)
     execute(
@@ -177,7 +180,7 @@ def job_edit(app_id):
 
 
 @bp.route("/jobs/<int:app_id>/cv.pdf")
-@active_required
+@login_required  # previewing your own CV PDF is a view action
 def job_cv_pdf(app_id):
     """Inline preview of the exact PDF that will be attached when sending."""
     app = _owned_app(app_id)
@@ -224,7 +227,7 @@ def job_send_all():
 
 
 @bp.route("/jobs/<int:app_id>/delete", methods=["POST"])
-@active_required
+@login_required  # managing/deleting your own data is allowed after the trial
 def job_delete(app_id):
     _owned_app(app_id)
     execute("DELETE FROM applications WHERE id = ?", (app_id,))
