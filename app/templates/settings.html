@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Settings — AutoApply BW{% endblock %}
+{% block title %}Settings, AutoApply BW{% endblock %}
 {% block content %}
 <h1>Settings</h1>
 
@@ -30,7 +30,7 @@
     <input id="smtp_user" name="smtp_user" type="email" value="{{ u['smtp_user'] }}" placeholder="you@gmail.com">
     <label for="smtp_password">App password</label>
     <input id="smtp_password" name="smtp_password" type="password" autocomplete="off"
-           placeholder="{{ '•••••••• (saved — leave blank to keep)' if u['smtp_password'] else 'app password' }}">
+           placeholder="{{ '•••••••• (saved, leave blank to keep)' if u['smtp_password'] else 'app password' }}">
     <label for="from_name">Display name on emails</label>
     <input id="from_name" name="from_name" value="{{ u['from_name'] }}" placeholder="{{ u['full_name'] }}">
 

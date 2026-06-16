@@ -37,6 +37,56 @@ def resolve_sender(user, app_config):
     return host, int(port), username, password, from_name, from_addr
 
 
+def _deliver(host, port, username, password, msg):
+    """Open an SMTP connection (SSL or STARTTLS), authenticate, and send."""
+    try:
+        if port == 465:
+            server = smtplib.SMTP_SSL(host, port, timeout=30)
+        else:
+            server = smtplib.SMTP(host, port, timeout=30)
+            server.ehlo()
+            if server.has_extn("starttls"):
+                server.starttls()
+                server.ehlo()
+        with server:
+            server.login(username, password)
+            server.send_message(msg)
+    except smtplib.SMTPAuthenticationError as exc:
+        raise EmailError(
+            "Email login failed. For Gmail/Outlook you usually need an app password, "
+            "not your normal password."
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise EmailError(f"Could not send email: {exc}") from exc
+
+
+def send_system_email(app_config, to_email, subject, body):
+    """Send a transactional email FROM the platform's own mailbox (the system
+    SMTP config, e.g. smtp.gmail.com) — used for password resets and notices.
+
+    Distinct from send_application(), which sends from each user's own inbox.
+    """
+    host = app_config.get("SMTP_HOST", "")
+    port = int(app_config.get("SMTP_PORT", 587) or 587)
+    username = app_config.get("SMTP_USER", "")
+    password = app_config.get("SMTP_PASSWORD", "")
+    from_name = app_config.get("SMTP_FROM_NAME", "") or "AutoApply BW"
+    if not (host and username and password):
+        raise EmailError(
+            "System email is not configured. Set SMTP_HOST / SMTP_USER / "
+            "SMTP_PASSWORD in .env (Gmail: smtp.gmail.com, port 587, app password)."
+        )
+    to_email = _header_safe(to_email)
+    if not valid_email(to_email):
+        raise EmailError(f"'{to_email}' is not a valid recipient.")
+    msg = EmailMessage()
+    msg["Subject"] = _header_safe(subject)
+    msg["From"] = f"{_header_safe(from_name)} <{username}>"
+    msg["To"] = to_email
+    msg.set_content(body)
+    _deliver(host, port, username, password, msg)
+
+
 def send_application(user, app_config, to_email, subject, body,
                      attachment_name=None, attachment_bytes=None):
     host, port, username, password, from_name, from_addr = resolve_sender(user, app_config)
@@ -64,24 +114,4 @@ def send_application(user, app_config, to_email, subject, body,
             filename=filename,
         )
 
-    try:
-        if port == 465:
-            server = smtplib.SMTP_SSL(host, port, timeout=30)
-        else:
-            server = smtplib.SMTP(host, port, timeout=30)
-            server.ehlo()
-            # Real providers (Gmail, Outlook) always offer STARTTLS and get it.
-            # Skipping it when absent keeps local/dev relays usable.
-            if server.has_extn("starttls"):
-                server.starttls()
-                server.ehlo()
-        with server:
-            server.login(username, password)
-            server.send_message(msg)
-    except smtplib.SMTPAuthenticationError as exc:
-        raise EmailError(
-            "Email login failed. For Gmail/Outlook you usually need an app password, "
-            "not your normal password."
-        ) from exc
-    except Exception as exc:  # noqa: BLE001
-        raise EmailError(f"Could not send email: {exc}") from exc
+    _deliver(host, port, username, password, msg)

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Application — AutoApply BW{% endblock %}
+{% block title %}Application, AutoApply BW{% endblock %}
 {% block content %}
 <p><a href="{{ url_for('main.dashboard') }}">&larr; Back to dashboard</a></p>
 <h1>{{ app['job_title'] or 'Application' }}</h1>
@@ -56,7 +56,7 @@
     <a class="btn secondary" href="{{ url_for('main.job_cv_pdf', app_id=app['id']) }}"
        target="_blank" rel="noopener">Preview CV (PDF)</a>
     <span class="muted" style="font-size:0.85rem">Opens the exact PDF the company will
-      receive{% if app['tailored_cv'] %} — save your edits first{% else %} (your base CV
+      receive{% if app['tailored_cv'] %}, save your edits first{% else %} (your base CV
       until you tailor this application){% endif %}.</span>
   </div>
   {% endif %}

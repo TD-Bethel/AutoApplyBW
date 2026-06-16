@@ -78,6 +78,8 @@ document.addEventListener("click", function (event) {
     }).then(function (r) { return r.json(); }).then(render);
   }
 
+  function closeChat() { panel.hidden = true; }
+
   fab.addEventListener("click", function () {
     var open = !panel.hidden;
     panel.hidden = open;
@@ -87,8 +89,11 @@ document.addEventListener("click", function (event) {
         .then(function (r) { return r.json(); }).then(render);
     }
   });
-  document.getElementById("chat-close").addEventListener("click", function () {
-    panel.hidden = true;
+  // Three ways to close: the header ×, the "Close chat" button, and Escape.
+  document.getElementById("chat-close").addEventListener("click", closeChat);
+  document.getElementById("chat-cancel").addEventListener("click", closeChat);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !panel.hidden) closeChat();
   });
   quick.addEventListener("click", function (e) {
     var btn = e.target.closest(".chat-option");
@@ -138,5 +143,31 @@ document.addEventListener("click", function (event) {
   box.addEventListener("mouseleave", start);
   if (!window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     start();
+  }
+})();
+
+// ---------------------------------------------------------- show/hide password
+// Add an eye toggle to every password field (login, signup, reset, settings).
+(function () {
+  var fields = document.querySelectorAll('input[type="password"]');
+  for (var i = 0; i < fields.length; i++) {
+    (function (input) {
+      var wrap = document.createElement("span");
+      wrap.className = "pw-wrap";
+      input.parentNode.insertBefore(wrap, input);
+      wrap.appendChild(input);
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "pw-toggle";
+      btn.setAttribute("aria-label", "Show password");
+      btn.textContent = "Show";
+      wrap.appendChild(btn);
+      btn.addEventListener("click", function () {
+        var hidden = input.type === "password";
+        input.type = hidden ? "text" : "password";
+        btn.textContent = hidden ? "Hide" : "Show";
+        btn.setAttribute("aria-label", hidden ? "Hide password" : "Show password");
+      });
+    })(fields[i]);
   }
 })();

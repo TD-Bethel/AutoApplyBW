@@ -73,6 +73,20 @@ CREATE TABLE IF NOT EXISTS support_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_support_user ON support_messages(user_id);
+
+-- Password reset tokens. We store only the SHA-256 of the token (never the raw
+-- value), so a database leak can't be used to reset anyone's password. Each
+-- token expires quickly and is single-use (used=1 after a successful reset).
+CREATE TABLE IF NOT EXISTS password_resets (
+    token_hash TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    expires_at TEXT NOT NULL,
+    used       INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_resets_user ON password_resets(user_id);
 """
 
 

@@ -7,9 +7,12 @@ Access model (owner stays in control):
   - AI + email features require an 'active', non-expired account.
 """
 import functools
-from datetime import date
+import hashlib
+import secrets
+from datetime import date, datetime, timedelta, timezone
 from flask import (
-    Blueprint, render_template, request, redirect, url_for, session, flash, g, abort
+    Blueprint, render_template, request, redirect, url_for, session, flash, g, abort,
+    current_app,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -17,6 +20,7 @@ from .db import query, execute, now_iso
 from .security import (
     valid_email, safe_next, too_many_attempts, record_failed_attempt, clear_attempts,
 )
+from .services.emailer import send_system_email, EmailError
 
 bp = Blueprint("auth", __name__)
 
@@ -171,6 +175,88 @@ def change_password():
         )
         flash("Password changed.", "success")
     return redirect(url_for("main.settings"))
+
+
+# ------------------------------------------------------------------ forgot password
+RESET_TTL_MINUTES = 30
+
+
+def _hash_token(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+@bp.route("/forgot", methods=["GET", "POST"])
+def forgot_password():
+    if g.user:
+        return redirect(url_for("main.dashboard"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()[:MAX_EMAIL]
+        user = query("SELECT * FROM users WHERE email = ?", (email,), one=True)
+        if user:
+            # Invalidate any earlier tokens for this user, then issue a fresh one.
+            execute("DELETE FROM password_resets WHERE user_id = ?", (user["id"],))
+            token = secrets.token_urlsafe(32)
+            expires = (datetime.now(timezone.utc)
+                       + timedelta(minutes=RESET_TTL_MINUTES)).isoformat()
+            execute(
+                "INSERT INTO password_resets (token_hash, user_id, expires_at, created_at)"
+                " VALUES (?, ?, ?, ?)",
+                (_hash_token(token), user["id"], expires, now_iso()),
+            )
+            link = url_for("auth.reset_password", token=token, _external=True)
+            body = (
+                f"Hello {user['full_name'] or ''},\n\n"
+                f"We received a request to reset your AutoApply BW password. "
+                f"Click the link below to choose a new password. It expires in "
+                f"{RESET_TTL_MINUTES} minutes and can only be used once.\n\n"
+                f"{link}\n\n"
+                f"If you did not request this, you can ignore this email; your "
+                f"password will not change.\n\nAutoApply BW"
+            )
+            try:
+                send_system_email(current_app.config, user["email"],
+                                  "Reset your AutoApply BW password", body)
+            except EmailError as exc:
+                current_app.logger.warning("Password reset email failed: %s", exc)
+        # Always show the same message — never reveal whether an email is registered.
+        flash("If that email is registered, a reset link has been sent. "
+              "Check your inbox (and spam folder).", "info")
+        return redirect(url_for("auth.login"))
+    return render_template("forgot_password.html")
+
+
+@bp.route("/reset/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    if g.user:
+        return redirect(url_for("main.dashboard"))
+    row = query("SELECT * FROM password_resets WHERE token_hash = ?",
+                (_hash_token(token),), one=True)
+    valid = bool(row) and not row["used"]
+    if valid:
+        try:
+            valid = datetime.fromisoformat(row["expires_at"]) > datetime.now(timezone.utc)
+        except ValueError:
+            valid = False
+    if not valid:
+        flash("That reset link is invalid or has expired. Please request a new one.",
+              "danger")
+        return redirect(url_for("auth.forgot_password"))
+
+    if request.method == "POST":
+        new = request.form.get("password", "")[:MAX_PASSWORD]
+        confirm = request.form.get("confirm", "")[:MAX_PASSWORD]
+        if len(new) < 8:
+            flash("Password must be at least 8 characters.", "danger")
+        elif new != confirm:
+            flash("The two passwords do not match.", "danger")
+        else:
+            execute("UPDATE users SET password_hash = ? WHERE id = ?",
+                    (generate_password_hash(new), row["user_id"]))
+            execute("UPDATE password_resets SET used = 1 WHERE token_hash = ?",
+                    (row["token_hash"],))
+            flash("Your password has been reset. You can now log in.", "success")
+            return redirect(url_for("auth.login"))
+    return render_template("reset_password.html", token=token)
 
 
 @bp.route("/logout", methods=["POST"])

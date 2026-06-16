@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ assistant.name }} — AutoApply BW{% endblock %}
+{% block title %}{{ assistant.name }}, AutoApply BW{% endblock %}
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
   <h1 style="margin:0">{{ assistant.name }}</h1>
@@ -19,7 +19,7 @@
 <div class="card chat-box" id="chat-box">
   {% if not thread %}
     <p class="muted" style="text-align:center;padding:1.5rem 0">
-      No messages yet — say hello and tell {{ assistant.name }} what you need.
+      No messages yet, say hello and tell {{ assistant.name }} what you need.
     </p>
   {% endif %}
   {% for m in thread %}
