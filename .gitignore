@@ -26,3 +26,6 @@ uploads/
 Thumbs.db
 .vscode/
 .idea/
+
+# Sibling project (its own separate repo)
+eFileTrace/
