@@ -28,6 +28,18 @@ Pure-Python and dependency-light so it installs and runs on any modern Python
 
 ---
 
+## Deploy (always-on, free)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/TD-Bethel/AutoApplyBW)
+
+One click reads the committed `render.yaml`; set `ADMIN_EMAIL` / `ADMIN_PASSWORD`
+when prompted and you get a permanent `https://…onrender.com` URL. AI features run
+on the free rule-based fallback unless you add `ANTHROPIC_API_KEY` in the dashboard.
+(Free tier sleeps when idle and uses ephemeral storage — see `render.yaml` for
+persistence. Fly.io remains an option via `fly.toml`.)
+
+---
+
 ## Quick start
 
 ```bash
