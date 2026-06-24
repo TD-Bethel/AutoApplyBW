@@ -569,3 +569,66 @@ img { max-width: 100%; height: auto; }
 /* Muted text needs to stay legible; bump weight slightly on small print. */
 .muted { color: var(--muted); }
 .caption-credit { opacity: 0.85; }
+
+/* ===================================================== MOBILE / RESPONSIVE === */
+.nav-toggle {
+  display: none; background: none; border: none; color: var(--ink);
+  cursor: pointer; padding: 0.25rem; line-height: 0;
+}
+
+@media (max-width: 720px) {
+  /* --- collapsible nav --- */
+  .topbar { position: relative; padding: 0.6rem 0.95rem; }
+  .nav-toggle { display: inline-flex; }
+  #main-nav {
+    display: none;
+    position: absolute; top: 100%; right: 0.7rem; left: 0.7rem;
+    flex-direction: column; align-items: stretch; gap: 0.15rem;
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: saturate(180%) blur(22px);
+    backdrop-filter: saturate(180%) blur(22px);
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 0.45rem; margin-top: 0.45rem; box-shadow: var(--shadow);
+  }
+  #main-nav.open { display: flex; }
+  #main-nav a, #main-nav .who {
+    display: block; padding: 0.6rem 0.65rem; border-radius: 9px; font-size: 0.95rem;
+  }
+  #main-nav a:hover { background: rgba(127, 127, 127, 0.12); }
+  #main-nav .who { font-size: 0.8rem; opacity: 0.75; }
+  #main-nav form.inline { display: block; margin-top: 0.2rem; }
+  #main-nav .btn-link { display: block; width: 100%; text-align: center; }
+  #main-nav .theme-toggle { align-self: flex-start; margin-bottom: 0.2rem; }
+
+  /* --- spacing / typography --- */
+  .container { margin: 1.1rem auto; padding: 0 0.85rem; }
+  .card { padding: 1.05rem 1.05rem; border-radius: 16px; margin-bottom: 1rem; }
+  h1 { font-size: 1.6rem; }
+  .brand { font-size: 1.12rem; }
+
+  /* --- forms: one column, comfortable tap targets --- */
+  .row { gap: 0.8rem; }
+  .row > * { min-width: 100%; }
+  input, textarea, select, .btn { font-size: 16px; }  /* 16px stops iOS zoom-on-focus */
+  .btn { padding: 0.7rem 1.2rem; }
+
+  /* --- tables scroll horizontally instead of overflowing --- */
+  table { display: block; overflow-x: auto; white-space: nowrap;
+          -webkit-overflow-scrolling: touch; }
+
+  /* --- landing hero --- */
+  .hero-split { gap: 1.4rem; }
+  .hero-split h1 { font-size: 2rem; }
+  .stat-strip { gap: 1rem; }
+
+  /* --- support chat fits small screens --- */
+  .chat-thread { max-height: 46vh; }
+  #chat-panel { right: 0.7rem; left: 0.7rem; width: auto; bottom: 5rem; }
+  #chat-fab { right: 1rem; bottom: 1rem; }
+}
+
+@media (max-width: 420px) {
+  .hero-split h1 { font-size: 1.7rem; }
+  .feature, .assistant-card { text-align: left; }
+  .card h2 { font-size: 1.15rem; }
+}

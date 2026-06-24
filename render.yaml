@@ -1,0 +1,29 @@
+# Render Blueprint — one-click deploy of AutoApply BW to a free web service.
+# In Render: New + -> Blueprint -> connect this repo. Render reads this file.
+# It will prompt you to fill the values marked `sync: false` (admin login).
+#
+# Note: the free plan's disk is EPHEMERAL — the SQLite database (users, CVs,
+# applications) resets on every redeploy/restart. That's fine for letting people
+# test; for persistence, attach a Render Disk and point DATABASE_PATH at it.
+services:
+  - type: web
+    name: autoapply-bw
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py --serve
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.5"
+      - key: HOST
+        value: "0.0.0.0"          # Render provides PORT; run.py reads both
+      - key: COOKIE_SECURE
+        value: "1"                # Render serves HTTPS -> secure cookies + HSTS
+      - key: SECRET_KEY
+        generateValue: true       # Render generates a strong random value
+      - key: ADMIN_EMAIL
+        sync: false               # you set this in the Render dashboard
+      - key: ADMIN_PASSWORD
+        sync: false               # you set this in the Render dashboard
+      # AI features work offline (rule-based fallback) with no key set.
+      # To use the Claude API instead, add ANTHROPIC_API_KEY in the dashboard.
