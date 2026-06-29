@@ -3,12 +3,9 @@
 {% block content %}
 <h1>Welcome, {{ g.user['full_name'] or g.user['email'] }}</h1>
 
-{% macro pay_numbers() %}
-  <p class="pay-numbers">
-    <strong>Orange Money:</strong> +267 74 390 351 &nbsp;•&nbsp;
-    <strong>Pay2cell / Ewallet:</strong> +267 74 390 351 &nbsp;•&nbsp;
-    <strong>MyZaka:</strong> +267 71 847 749 &nbsp;•&nbsp;
-    <strong>Smega:</strong> +267 76 834 418
+{% macro pay_cta() %}
+  <p class="pay-cta">
+    <a class="btn" href="{{ url_for('billing.index') }}">Pay by card to unlock full access</a>
   </p>
 {% endmacro %}
 
@@ -19,25 +16,23 @@
     <strong>{{ trial.emails_left }}</strong> email(s),
     <strong>{{ trial.uploads_left }}</strong> CV upload(s),
     <strong>{{ trial.days_left }}</strong> day(s) — whichever runs out first.
-    To unlock unlimited access, pay your subscription and contact the admin
-    (or use the support chat).
-    {{ pay_numbers() }}
+    Pay by card to unlock unlimited access instantly.
+    {{ pay_cta() }}
   </div>
 {% elif trial and trial.over %}
   <div class="notice">
     <strong>Your free trial has ended.</strong>
     You can still view your data, but CV tailoring, job search, and sending are
-    locked. Pay your subscription and contact the admin (or use the support
-    chat) to unlock full access.
-    {{ pay_numbers() }}
+    locked. Pay by card to unlock full access instantly.
+    {{ pay_cta() }}
   </div>
 {% elif not is_active %}
   <div class="notice">
     <strong>Your account is pending activation.</strong>
-    Pay your subscription and contact the admin to unlock CV tailoring and sending.
+    Pay by card to unlock CV tailoring and sending instantly.
     You can still set up your profile in
     <a href="{{ url_for('main.settings') }}">Settings</a>.
-    {{ pay_numbers() }}
+    {{ pay_cta() }}
   </div>
 {% endif %}
 

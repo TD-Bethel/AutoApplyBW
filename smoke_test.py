@@ -65,7 +65,13 @@ tok = get_csrf("/login")
 r = client.post("/login", data={"_csrf": tok, "email": "user@test.local", "password": "password123"},
                 follow_redirects=True)
 check("login works", b"Welcome, Test User" in r.data)
-check("pending banner shows payment numbers", b"Orange Money" in r.data and b"74 390 351" in r.data)
+check("pending banner shows pay-by-card CTA", b"/billing" in r.data and b"Pay by card" in r.data)
+
+# --- billing page renders; webhook rejects an unsigned call
+r = client.get("/billing/", follow_redirects=True)
+check("billing page renders", b"Subscription" in r.data)
+r = client.post("/billing/webhook", json={"data": {"tx_ref": "x", "id": 1}})
+check("webhook rejects missing/forged signature", r.status_code == 401)
 
 # --- open redirect blocked
 client.post("/logout", data={"_csrf": get_csrf("/dashboard") or get_csrf("/login")})
