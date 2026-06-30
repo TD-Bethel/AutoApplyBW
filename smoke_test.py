@@ -74,6 +74,7 @@ check("billing page renders", b"Subscription" in r.data)
 # --- Jobs page renders and offers search
 r = client.get("/jobs")
 check("jobs page renders", r.status_code == 200 and b"Available jobs" in r.data and b"Currently available" in r.data)
+check("jobs page lists apply-directly employers", b"Apply directly" in r.data and b"Access Bank Botswana" in r.data)
 r = client.post("/billing/webhook", json={"data": {"tx_ref": "x", "id": 1}})
 check("webhook rejects missing/forged signature", r.status_code == 401)
 

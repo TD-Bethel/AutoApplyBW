@@ -101,4 +101,22 @@ Advert: {{ j.url }}{% endif %}">
       page in a moment.</p>
   {% endif %}
 </div>
+
+{# ---------------- Apply directly (employers we can't auto-scrape) ---------------- #}
+{% if directory %}
+<div class="card">
+  <h2>Apply directly at these employers</h2>
+  <p class="muted">These companies post jobs on their own portals, which we can't
+    list automatically. Open their careers page to see and apply for current roles.</p>
+  <ul>
+    {% for e in directory %}
+    <li>
+      <a href="{{ e.url }}" target="_blank" rel="noopener noreferrer">{{ e.name }}</a>
+      {% if e.country and countries.get(e.country) %}<span class="badge">{{ countries[e.country] }}</span>{% endif %}
+      {% if e.note %}<span class="muted"> — {{ e.note }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
 {% endblock %}

@@ -88,6 +88,7 @@ def jobs():
         find_location=location,
         find_country=country,
         is_active=feature_access(g.user),
+        directory=scraper.EMPLOYER_DIRECTORY,
     )
 
 
