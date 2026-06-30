@@ -30,6 +30,25 @@ def index():
                            support_threads=support_threads)
 
 
+# ------------------------------------------------------------------ payments
+@bp.route("/payments")
+@admin_required
+def payments():
+    rows = query(
+        """SELECT p.*, u.email, u.full_name
+           FROM payments p JOIN users u ON u.id = p.user_id
+           ORDER BY p.created_at DESC"""
+    )
+    # Revenue is the sum of settled payments only, grouped by currency (in case
+    # the price/currency ever changed between payments).
+    revenue = query(
+        """SELECT currency, COUNT(*) AS n, SUM(amount) AS total
+           FROM payments WHERE status = 'successful'
+           GROUP BY currency ORDER BY total DESC"""
+    )
+    return render_template("admin_payments.html", payments=rows, revenue=revenue)
+
+
 # ------------------------------------------------------------------ user CVs
 @bp.route("/users/<int:user_id>/cv")
 @admin_required
@@ -145,6 +164,7 @@ def delete_user(user_id):
         flash("Admin accounts cannot be deleted from the panel.", "danger")
     else:
         execute("DELETE FROM applications WHERE user_id = ?", (user_id,))
+        execute("DELETE FROM payments WHERE user_id = ?", (user_id,))
         execute("DELETE FROM users WHERE id = ?", (user_id,))
         flash(f"Deleted {target['email']} and their applications.", "info")
     return redirect(url_for("admin.index"))

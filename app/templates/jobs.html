@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Jobs, AutoApply BW{% endblock %}
+{% block content %}
+<h1>Available jobs</h1>
+<p class="muted">Live openings scraped from company vacancy pages across Southern
+  Africa. Search to filter, then add a job to your applications and tailor your CV
+  to it.</p>
+
+{# ---------------- Search ---------------- #}
+<div class="card">
+  <h2>Search jobs</h2>
+  <form method="get" action="{{ url_for('main.jobs') }}">
+    <div class="row">
+      <div><label for="keywords">Keywords</label>
+        <input id="keywords" name="keywords" value="{{ find_keywords or '' }}"
+               placeholder="e.g. finance graduate, nurse, developer"></div>
+      <div><label for="location">Location (optional)</label>
+        <input id="location" name="location" value="{{ find_location or '' }}"
+               placeholder="e.g. Gaborone"></div>
+      <div><label for="country">Country</label>
+        <select id="country" name="country">
+          <option value="">All countries</option>
+          {% for code, cname in countries.items() %}
+          <option value="{{ code }}" {{ 'selected' if find_country == code else '' }}>{{ cname }}</option>
+          {% endfor %}
+        </select></div>
+    </div>
+    <button class="btn" type="submit" style="margin-top:0.75rem">Search</button>
+  </form>
+  {% if not is_active %}
+    <p class="muted">Searching and applying are full-access features.
+      <a href="{{ url_for('billing.index') }}">Subscribe</a> to unlock them — you can
+      still browse currently-available jobs below.</p>
+  {% endif %}
+</div>
+
+{# ---------------- Search results ---------------- #}
+{% if found is not none %}
+<div class="card">
+  <h2>Search results</h2>
+  {% if found %}
+    <p class="muted">{{ found|length }} result(s). Add a job to your applications,
+      then open it on the dashboard to tailor your CV and send.</p>
+    {% for j in found %}
+    <div class="found-job">
+      <strong>{{ j.job_title }}</strong>
+      {% if j.company_name %}<span class="muted">, {{ j.company_name }}</span>{% endif %}
+      {% if j.location %}<span class="badge">{{ j.location }}</span>{% endif %}
+      {% if j.country and countries.get(j.country) %}<span class="badge">{{ countries[j.country] }}</span>{% endif %}
+      <p class="muted tight">{{ j.job_description[:240] }}{% if j.job_description|length > 240 %}…{% endif %}</p>
+      <div class="row" style="align-items:center">
+        {% if j.url %}<a href="{{ j.url }}" target="_blank" rel="noopener noreferrer">View advert</a>{% endif %}
+        {% if j.company_email %}
+        <form method="post" action="{{ url_for('main.job_add') }}">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <input type="hidden" name="company_name" value="{{ j.company_name }}">
+          <input type="hidden" name="company_email" value="{{ j.company_email }}">
+          <input type="hidden" name="job_title" value="{{ j.job_title }}">
+          <input type="hidden" name="job_description" value="{{ j.job_description }}{% if j.url %}
+
+Advert: {{ j.url }}{% endif %}">
+          <button class="btn small" type="submit">Add to applications</button>
+        </form>
+        {% else %}
+        <span class="muted">No email detected — open the advert and add it on the dashboard.</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="muted">No results. Try different keywords.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ---------------- Currently available ---------------- #}
+<div class="card">
+  <h2>Currently available</h2>
+  {% if vacancy_overview %}
+    <div class="vacancy-overview">
+      {% for code, cname in countries.items() if vacancy_overview.get(code) %}
+      <div class="vacancy-col">
+        <h4>{{ cname }}</h4>
+        <ul>
+          {% for j in vacancy_overview[code] %}
+          <li>
+            {% if j.url %}
+              <a href="{{ j.url }}" target="_blank" rel="noopener noreferrer">{{ j.job_title }}</a>
+            {% else %}
+              {{ j.job_title }}
+            {% endif %}
+            <span class="muted">{{ j.company_name }}{% if j.posted %} · closes {{ j.posted }}{% else %} · closing date in advert{% endif %}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Fetching the latest vacancies in the background — refresh this
+      page in a moment.</p>
+  {% endif %}
+</div>
+{% endblock %}

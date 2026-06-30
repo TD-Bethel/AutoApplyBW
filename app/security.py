@@ -18,6 +18,16 @@ def valid_email(value):
 
 
 # ------------------------------------------------------------------ CSRF
+# Endpoints that authenticate by other means (e.g. a provider webhook proving
+# itself with a signed header) and therefore must NOT be CSRF-checked.
+_CSRF_EXEMPT = set()
+
+
+def csrf_exempt(endpoint):
+    """Register a view endpoint (e.g. "billing.webhook") as CSRF-exempt."""
+    _CSRF_EXEMPT.add(endpoint)
+
+
 def csrf_token():
     """Return (creating if needed) the per-session CSRF token."""
     token = session.get("_csrf")
@@ -30,6 +40,8 @@ def csrf_token():
 def csrf_protect():
     """Reject state-changing requests without a valid CSRF token."""
     if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return
+    if request.endpoint in _CSRF_EXEMPT:
         return
     expected = session.get("_csrf", "")
     received = request.form.get("_csrf", "") or request.headers.get("X-CSRF-Token", "")

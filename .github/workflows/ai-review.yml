@@ -1,0 +1,123 @@
+# AI code review — every PR gets an automated architecture-level review by Claude.
+# It posts inline comments and emits a structured verdict; the gate step below
+# FAILS the job when there is any CRITICAL finding, so (with branch protection
+# requiring this check) the PR cannot merge until the critical issues are gone.
+# Warnings are informational and never block.
+#
+# One-time setup (see docs/ai-review.md):
+#   1. Create the OAuth token:  claude setup-token
+#   2. Add it as a repo secret: CLAUDE_CODE_OAUTH_TOKEN
+#   3. Make "AI Code Review" a required status check on `main`.
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Re-running on a new push cancels the stale review for the same PR.
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+jobs:
+  ai-review:
+    # This job name is the status-check context you mark "required" on main.
+    name: AI Code Review
+    runs-on: ubuntu-latest
+    # Skip drafts; they review once marked ready.
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude review
+        id: review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Sonnet is fast and light on subscription limits; switch the --model
+          # line to claude-opus-4-8 for the deepest review if you prefer.
+          claude_args: |
+            --model claude-sonnet-4-6
+            --json-schema .github/review-schema.json
+          prompt: |
+            You are a senior staff engineer reviewing this pull request for
+            AutoApply BW — a Flask + sqlite3 (stdlib, no ORM) job-application app.
+            Review ONLY the changes in this PR's diff. Your job is to catch what
+            would break production, not to police style.
+
+            Review for, in priority order:
+            1. Business-logic correctness — does the change actually do what it
+               intends? Broken control flow, inverted/wrong conditions, off-by-one,
+               incorrect state transitions, wrong return values.
+            2. SQL injection and other injection vectors — any SQL built with
+               f-strings/string concatenation instead of the parameterised
+               query()/execute() helpers in app/db.py; unsanitised user input
+               reaching SQL, the shell, HTML, or email headers (SMTP values must be
+               CR/LF-stripped).
+            3. Unhandled edge cases — None/empty/missing inputs, unchecked external
+               responses (AI API, job sources, SMTP), error paths, race conditions.
+            4. N+1 queries and performance regressions — queries inside loops,
+               missing batching, or blocking I/O holding a request thread.
+            5. Architecture — logic that belongs in app/services/ leaking into route
+               handlers, or broken project invariants.
+
+            ALWAYS escalate to CRITICAL anything that touches AUTHENTICATION /
+            AUTHORIZATION / SESSIONS, PAYMENTS or ACCOUNT ACTIVATION, or DATA
+            DELETION / destructive operations. For these, be strict: a state-changing
+            form missing the CSRF token (_csrf + csrf_token()), a user-owned row not
+            checked via _owned_app(), a missing privilege/admin check, or an
+            irreversible delete without confirmation is CRITICAL.
+
+            Severity:
+            - critical = will break production, lose or corrupt data, or open a
+              security hole. These BLOCK the merge.
+            - warning = worth knowing but not blocking. Informational only.
+
+            Do NOT comment on style, formatting, naming, import order, line length,
+            or subjective preferences. They are out of scope — ignore them entirely.
+
+            Post each finding as an inline review comment on the exact changed line,
+            stating the failure mode or invariant at risk and a concrete fix. Be
+            specific; no generic praise or filler.
+
+            Then return your final result strictly conforming to the provided JSON
+            schema (critical_count, warning_count, findings[], summary). Count a
+            finding as critical only if it meets the critical bar above.
+
+      - name: Gate merge on critical findings
+        if: always() && steps.review.conclusion == 'success'
+        env:
+          # Pass via env (not inline interpolation) to avoid shell injection.
+          VERDICT: ${{ steps.review.outputs.structured_output }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERDICT:-}" ]; then
+            echo "::error::The reviewer produced no structured verdict — failing closed."
+            echo "Re-run the job; if it persists, check the CLAUDE_CODE_OAUTH_TOKEN secret."
+            exit 1
+          fi
+          echo "$VERDICT" > verdict.json
+          critical=$(jq -r '.critical_count // "null"' verdict.json)
+          warnings=$(jq -r '.warning_count // 0' verdict.json)
+          summary=$(jq -r '.summary // ""' verdict.json)
+          echo "## AI review verdict" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Critical: **$critical**   Warnings: **$warnings**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "$summary" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$critical" = "null" ]; then
+            echo "::error::Verdict missing critical_count — failing closed."
+            exit 1
+          fi
+          if [ "$critical" -gt 0 ]; then
+            echo "::error::$critical critical issue(s) found — blocking merge until resolved."
+            exit 1
+          fi
+          echo "No critical issues. $warnings warning(s) are informational. Merge allowed."

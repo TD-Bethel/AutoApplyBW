@@ -88,6 +88,25 @@ CREATE TABLE IF NOT EXISTS password_resets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_resets_user ON password_resets(user_id);
+
+-- Card payments (Flutterwave hosted checkout). One row per attempt; tx_ref is
+-- our own reference (sent to the provider) and is unique so a webhook + the
+-- browser callback for the same payment settle it exactly once.
+CREATE TABLE IF NOT EXISTS payments (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    tx_ref     TEXT UNIQUE NOT NULL,
+    flw_tx_id  TEXT,                                -- provider transaction id (on success)
+    amount     REAL NOT NULL,
+    currency   TEXT NOT NULL DEFAULT 'BWP',
+    days       INTEGER NOT NULL,                    -- access days this payment grants
+    status     TEXT NOT NULL DEFAULT 'pending',     -- 'pending' | 'successful' | 'failed'
+    created_at TEXT NOT NULL,
+    paid_at    TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
 """
 
 

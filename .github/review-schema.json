@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI PR review verdict",
+  "description": "Machine-readable result of the automated PR review. The gate step blocks the merge when critical_count > 0; warnings are informational only.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "critical_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of CRITICAL findings (security holes, data loss/corruption, broken production logic, or any unguarded change to auth/payments/data-deletion). Any value > 0 blocks the merge."
+    },
+    "warning_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of WARNING findings. Informational; never blocks a merge."
+    },
+    "findings": {
+      "type": "array",
+      "description": "One entry per finding, mirrored as an inline PR comment.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "severity": { "type": "string", "enum": ["critical", "warning"] },
+          "category": {
+            "type": "string",
+            "enum": ["business-logic", "sql-injection", "edge-case", "n+1", "auth", "payments", "data-deletion", "architecture", "other"]
+          },
+          "file": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "message": { "type": "string" }
+        },
+        "required": ["severity", "category", "file", "message"]
+      }
+    },
+    "summary": {
+      "type": "string",
+      "description": "One short paragraph: the merge verdict and why."
+    }
+  },
+  "required": ["critical_count", "warning_count", "findings", "summary"]
+}

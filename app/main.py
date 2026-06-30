@@ -58,6 +58,39 @@ def dashboard():
     return render_template("dashboard.html", **_dashboard_context())
 
 
+@bp.route("/jobs")
+@login_required
+def jobs():
+    """Dedicated Jobs page: browse currently-available vacancies and search.
+    Browsing is open to any logged-in user; running a search is a full-access
+    feature (paid or in-trial), matching the dashboard's Find-jobs gating."""
+    scraper.warm_async()  # fill the vacancy cache in the background
+    keywords = request.args.get("keywords", "").strip()[:MAX_FIELD]
+    location = request.args.get("location", "").strip()[:MAX_FIELD]
+    country = request.args.get("country", "").strip()
+    if country not in scraper.COUNTRIES:
+        country = ""  # "" = all countries
+    found = None  # None = no search run yet; [] = searched, nothing matched
+    if (keywords or location or country) and feature_access(g.user):
+        try:
+            found = scraper.search(keywords=keywords, location=location, country=country)
+        except Exception:  # noqa: BLE001 — search must never 500 the page
+            current_app.logger.exception("Job search failed")
+            found = []
+            flash("Job search is unavailable right now. Please try again later.", "warning")
+        if not found and keywords:
+            flash("No matching jobs found. Try fewer or different keywords.", "info")
+    return render_template(
+        "jobs.html",
+        vacancy_overview=scraper.overview(per_country=12),
+        found=found,
+        find_keywords=keywords,
+        find_location=location,
+        find_country=country,
+        is_active=feature_access(g.user),
+    )
+
+
 # ------------------------------------------------------------------ CV upload + review
 @bp.route("/cv/upload", methods=["POST"])
 @active_required
