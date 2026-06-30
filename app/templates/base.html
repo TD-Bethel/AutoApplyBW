@@ -24,6 +24,7 @@
         <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
         <a href="{{ url_for('assistants.index') }}">Career Team</a>
         <a href="{{ url_for('main.settings') }}">Settings</a>
+        <a href="{{ url_for('billing.index') }}">Subscription</a>
         {% if g.user['role'] == 'admin' %}<a href="{{ url_for('admin.index') }}">Admin</a>{% endif %}
         <span class="who">{{ g.user['full_name'] or g.user['email'] }}</span>
         <form method="post" action="{{ url_for('auth.logout') }}" class="inline">

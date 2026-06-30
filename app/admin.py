@@ -30,6 +30,25 @@ def index():
                            support_threads=support_threads)
 
 
+# ------------------------------------------------------------------ payments
+@bp.route("/payments")
+@admin_required
+def payments():
+    rows = query(
+        """SELECT p.*, u.email, u.full_name
+           FROM payments p JOIN users u ON u.id = p.user_id
+           ORDER BY p.created_at DESC"""
+    )
+    # Revenue is the sum of settled payments only, grouped by currency (in case
+    # the price/currency ever changed between payments).
+    revenue = query(
+        """SELECT currency, COUNT(*) AS n, SUM(amount) AS total
+           FROM payments WHERE status = 'successful'
+           GROUP BY currency ORDER BY total DESC"""
+    )
+    return render_template("admin_payments.html", payments=rows, revenue=revenue)
+
+
 # ------------------------------------------------------------------ user CVs
 @bp.route("/users/<int:user_id>/cv")
 @admin_required

@@ -103,6 +103,8 @@ tok = get_csrf("/login")
 client.post("/login", data={"_csrf": tok, "email": "admin@test.local", "password": "admin-password-123"})
 r = client.get("/admin/")
 check("admin panel renders", r.status_code == 200 and b"user@test.local" in r.data)
+r = client.get("/admin/payments")
+check("admin payments page renders", r.status_code == 200 and b"Payments" in r.data)
 tok = get_csrf("/admin/")
 r = client.post("/admin/users/2/activate", data={"_csrf": tok, "access_expires": "bad-date"},
                 follow_redirects=True)
