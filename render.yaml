@@ -1,10 +1,14 @@
-# Render Blueprint — one-click deploy of AutoApply BW to a free web service.
-# In Render: New + -> Blueprint -> connect this repo. Render reads this file.
-# It will prompt you to fill the values marked `sync: false` (admin login).
+# Render Blueprint — deploy AutoApply BW.
+# In Render: New + -> Blueprint -> connect this repo. Render reads this file and
+# prompts you for the values marked `sync: false` (admin login + payment keys).
 #
-# Note: the free plan's disk is EPHEMERAL — the SQLite database (users, CVs,
-# applications) resets on every redeploy/restart. That's fine for letting people
-# test; for persistence, attach a Render Disk and point DATABASE_PATH at it.
+# IMPORTANT — data persistence:
+#   On the FREE plan the disk is EPHEMERAL: the SQLite database (users, CVs,
+#   applications, PAYMENTS) is wiped on every redeploy/restart, and the service
+#   sleeps after ~15 min idle. That is fine to trial the deploy, but NOT for a
+#   live app taking card payments — paying users would lose their access.
+#   To run for real, switch to the persistent setup: see the commented block at
+#   the bottom (plan: starter + a Render Disk + DATABASE_PATH on it).
 services:
   - type: web
     name: autoapply-bw
@@ -22,8 +26,41 @@ services:
       - key: SECRET_KEY
         generateValue: true       # Render generates a strong random value
       - key: ADMIN_EMAIL
-        sync: false               # you set this in the Render dashboard
+        sync: false               # set in the Render dashboard
       - key: ADMIN_PASSWORD
-        sync: false               # you set this in the Render dashboard
+        sync: false               # set in the Render dashboard
+
+      # ---- Card payments (Flutterwave) ------------------------------------
+      # Paste your LIVE (or TEST) keys in the dashboard when prompted. Leave
+      # them blank to launch without card billing (admin can activate manually).
+      - key: FLW_SECRET_KEY
+        sync: false
+      - key: FLW_PUBLIC_KEY
+        sync: false
+      - key: FLW_WEBHOOK_HASH       # the "Secret hash" from FLW Settings -> Webhooks;
+        sync: false                 # point the webhook at https://<your-app>.onrender.com/billing/webhook
+      - key: SUBSCRIPTION_PRICE_BWP
+        value: "50"
+      - key: SUBSCRIPTION_CURRENCY
+        value: "BWP"
+      - key: SUBSCRIPTION_DAYS
+        value: "30"
+
       # AI features work offline (rule-based fallback) with no key set.
       # To use the Claude API instead, add ANTHROPIC_API_KEY in the dashboard.
+
+# ---------------------------------------------------------------------------
+# GO-LIVE (persistent) configuration. When you're ready to take real payments,
+# replace `plan: free` above with `plan: starter`, add the disk + DATABASE_PATH
+# below, and redeploy. The SQLite DB then lives on the disk and survives
+# redeploys; the service also stops sleeping. (~$7/mo instance + ~$0.25/GB/mo.)
+#
+#    plan: starter
+#    disk:
+#      name: data
+#      mountPath: /var/data
+#      sizeGB: 1
+#    envVars:
+#      - key: DATABASE_PATH
+#        value: "/var/data/autoapply.db"
+# ---------------------------------------------------------------------------
