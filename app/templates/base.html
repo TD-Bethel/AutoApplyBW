@@ -22,6 +22,7 @@
               aria-label="Toggle dark mode" title="Toggle dark mode">Dark</button>
       {% if g.user %}
         <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('main.jobs') }}">Jobs</a>
         <a href="{{ url_for('assistants.index') }}">Career Team</a>
         <a href="{{ url_for('main.settings') }}">Settings</a>
         <a href="{{ url_for('billing.index') }}">Subscription</a>

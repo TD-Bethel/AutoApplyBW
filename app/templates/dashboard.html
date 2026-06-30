@@ -78,6 +78,7 @@
   <p class="muted">Searches live company vacancy pages across Southern Africa for current
     openings. Add any result to your applications below, fill in the application
     email from the advert if it isn't detected automatically.</p>
+  <p><a class="btn secondary" href="{{ url_for('main.jobs') }}">View all available jobs &rarr;</a></p>
   <form method="post" action="{{ url_for('main.job_find') }}">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="row">

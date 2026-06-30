@@ -70,6 +70,10 @@ check("pending banner shows pay-by-card CTA", b"/billing" in r.data and b"Pay by
 # --- billing page renders; webhook rejects an unsigned call
 r = client.get("/billing/", follow_redirects=True)
 check("billing page renders", b"Subscription" in r.data)
+
+# --- Jobs page renders and offers search
+r = client.get("/jobs")
+check("jobs page renders", r.status_code == 200 and b"Available jobs" in r.data and b"Currently available" in r.data)
 r = client.post("/billing/webhook", json={"data": {"tx_ref": "x", "id": 1}})
 check("webhook rejects missing/forged signature", r.status_code == 401)
 
