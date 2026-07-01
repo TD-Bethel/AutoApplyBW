@@ -339,7 +339,7 @@ body.bg-auth {
 body.bg-app {
   background:
     linear-gradient(rgba(245, 246, 248, 0.46), rgba(245, 246, 248, 0.56) 45%, rgba(245, 246, 248, 0.70)),
-    url("img/setswana.jpg") center / cover no-repeat fixed;
+    url("img/bg-app.jpg") center / cover no-repeat fixed;
 }
 /* On photo backgrounds, readability lives in the cards */
 body.bg-auth .card, body.bg-app .card,
@@ -541,7 +541,7 @@ html[data-theme="dark"] body.bg-auth {
 html[data-theme="dark"] body.bg-app {
   background:
     linear-gradient(rgba(15, 16, 20, 0.78), rgba(15, 16, 20, 0.88)),
-    url("img/setswana.jpg") center / cover no-repeat fixed;
+    url("img/bg-app.jpg") center / cover no-repeat fixed;
 }
 html[data-theme="dark"] .topbar { background: rgba(18, 19, 24, 0.82); }
 html[data-theme="dark"] input,
