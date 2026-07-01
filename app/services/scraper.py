@@ -482,6 +482,21 @@ _RSS_SOURCES = [
     # e.g. {"name": "Jobs Botswana", "feed": "https://www.example.co.bw/jobs/feed/"},
 ]
 
+# Employers whose openings we can't scrape — JavaScript-rendered career portals
+# (e.g. Workable / Sitecore JSS) that need a real browser, which the stdlib-only
+# rule rules out — but that job-seekers should still check. These are shown on
+# the Jobs page as direct "apply on their site" links; they are NEVER fetched.
+# Add a dict here to surface another employer's careers page the same way.
+EMPLOYER_DIRECTORY = [
+    {"name": "Access Bank Botswana", "country": "BW",
+     "url": "https://careers.accessbankplc.com/jobs",
+     "note": "Group careers portal (Workable) — filter the list for Botswana roles."},
+    {"name": "Bank of Baroda (Botswana)", "country": "BW",
+     "url": "https://www.bankofbaroda.co.bw/about-us/careers",
+     "note": "Current vacancies are posted on the bank's own careers page."},
+]
+
+
 SOURCES = {
     "mascom": {"name": "mascom", "country": "BW", "fetch": _fetch_mascom},
     "btcl": {"name": "btcl", "country": "BW", "fetch": _fetch_btcl},
