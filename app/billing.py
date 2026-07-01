@@ -1,14 +1,15 @@
-"""Self-service card payments (Flutterwave hosted checkout).
+"""Self-service card payments via a hosted-checkout gateway (DPO Pay by default,
+Flutterwave optionally — see app/services/payments.py).
 
-Replaces the old offline (Orange Money / MyZaka) flow: a successful payment
-flips the user to 'active' and extends access_expires by the configured number
-of days. Admin manual activation in /admin stays as a backstop.
+Replaces the old offline (Orange Money / MyZaka) flow: a successful payment flips
+the user to 'active' and extends access_expires by the configured number of days.
+Admin manual activation in /admin stays as a backstop.
 
 Two paths confirm a payment, and both go through _settle() so it is verified
 server-side and applied exactly once (idempotent):
-  - /billing/callback  — the browser redirect back from Flutterwave (user-facing).
-  - /billing/webhook   — Flutterwave's server-to-server notification (authoritative,
-                         in case the user closes the tab before the redirect).
+  - /billing/callback  — the browser redirect back from the gateway (user-facing).
+  - /billing/webhook   — a provider's server-to-server notification (Flutterwave),
+                         in case the user closes the tab before the redirect.
 """
 import secrets
 from datetime import date, timedelta
@@ -65,7 +66,7 @@ def checkout():
         return redirect(url_for("billing.index"))
     currency = cfg.get("SUBSCRIPTION_CURRENCY", "BWP")
     days = _days(cfg)
-    # Our own reference; ties the provider's transaction back to this user/row.
+    # Our own reference; ties the gateway's transaction back to this user/row.
     tx_ref = f"abw-{g.user['id']}-{secrets.token_hex(8)}"
     execute(
         "INSERT INTO payments (user_id, tx_ref, amount, currency, days, status, created_at)"
@@ -73,19 +74,24 @@ def checkout():
         (g.user["id"], tx_ref, amount, currency, days, now_iso()),
     )
     try:
-        link = payments.create_checkout(
+        checkout_url, provider_ref = payments.create_checkout(
             cfg, tx_ref=tx_ref, amount=amount, currency=currency,
             customer_email=g.user["email"], customer_name=g.user["full_name"],
             redirect_url=url_for("billing.callback", _external=True),
+            back_url=url_for("billing.index", _external=True),
         )
     except payments.PaymentError as exc:
         current_app.logger.warning("Checkout failed for %s: %s", tx_ref, exc)
         flash("Could not start the payment. Please try again in a moment.", "danger")
         return redirect(url_for("billing.index"))
-    return redirect(link)
+    if provider_ref:
+        # Store the gateway's token now so we can verify even if the user never
+        # makes it back to the callback.
+        execute("UPDATE payments SET flw_tx_id = ? WHERE tx_ref = ?", (provider_ref, tx_ref))
+    return redirect(checkout_url)
 
 
-def _apply_payment(payment, flw_tx_id):
+def _apply_payment(payment, provider_ref=None):
     """Idempotently grant access for a verified, successful payment."""
     if payment["status"] == "successful":
         return  # already applied — never double-extend
@@ -105,48 +111,41 @@ def _apply_payment(payment, flw_tx_id):
     new_expiry = (base + timedelta(days=payment["days"])).isoformat()
     execute("UPDATE users SET status = 'active', access_expires = ? WHERE id = ?",
             (new_expiry, payment["user_id"]))
+    ref = provider_ref or payment["flw_tx_id"]
     execute("UPDATE payments SET status = 'successful', flw_tx_id = ?, paid_at = ? WHERE id = ?",
-            (str(flw_tx_id), now_iso(), payment["id"]))
+            (str(ref or ""), now_iso(), payment["id"]))
 
 
-def _settle(tx_ref, flw_tx_id):
-    """Verify a transaction with Flutterwave and apply it if genuinely paid.
-    Returns True if access is (now or already) granted."""
+def _settle(tx_ref, request_args):
+    """Verify a transaction with the gateway and apply it if genuinely paid.
+    Returns True if access is (now or already) granted. request_args is the
+    callback query or a webhook body."""
     payment = query("SELECT * FROM payments WHERE tx_ref = ?", (tx_ref,), one=True)
     if payment is None:
         return False
     if payment["status"] == "successful":
         return True  # idempotent: a prior callback/webhook already settled it
     try:
-        data = payments.verify_transaction(current_app.config, flw_tx_id)
+        ok = payments.verify(current_app.config, payment, request_args)
     except payments.PaymentError as exc:
         current_app.logger.warning("Verify failed for %s: %s", tx_ref, exc)
         return False
-    # Trust only the provider's verified figures, and only if they match what we
-    # asked this user to pay — guards against tampered redirects and replays.
-    try:
-        paid_amount = float(data.get("amount") or 0)
-    except (TypeError, ValueError):
-        paid_amount = 0.0
-    ok = (data.get("status") == "successful"
-          and data.get("tx_ref") == tx_ref
-          and data.get("currency") == payment["currency"]
-          and paid_amount >= float(payment["amount"]))
     if not ok:
         execute("UPDATE payments SET status = 'failed' WHERE id = ? AND status = 'pending'",
                 (payment["id"],))
         return False
-    _apply_payment(payment, data.get("id") or flw_tx_id)
+    provider_ref = request_args.get("transaction_id") or request_args.get("id")
+    _apply_payment(payment, provider_ref)
     return True
 
 
 @bp.route("/callback")
 @login_required
 def callback():
-    status = request.args.get("status", "")
-    tx_ref = request.args.get("tx_ref", "")
-    flw_tx_id = request.args.get("transaction_id", "")
-    if status == "successful" and tx_ref and flw_tx_id and _settle(tx_ref, flw_tx_id):
+    args = request.args
+    # Flutterwave returns tx_ref; DPO returns CompanyRef — both hold our tx_ref.
+    tx_ref = args.get("tx_ref") or args.get("CompanyRef") or ""
+    if tx_ref and _settle(tx_ref, args):
         flash("Payment received — your account is now active. Thank you!", "success")
     else:
         flash("Payment was not completed. If you were charged but still see this, "
@@ -157,8 +156,9 @@ def callback():
 @bp.route("/webhook", methods=["POST"])
 def webhook():
     """Flutterwave server-to-server confirmation. CSRF-exempt by design (there is
-    no session/form); authenticity is proven by the shared secret-hash header
-    that the owner configures in the Flutterwave dashboard."""
+    no session/form); authenticity is proven by the shared secret-hash header that
+    the owner configures in the Flutterwave dashboard. (DPO confirms via the
+    redirect callback instead, so it does not use this endpoint.)"""
     expected = current_app.config.get("FLW_WEBHOOK_HASH", "")
     received = request.headers.get("verif-hash", "")
     if not expected or not secrets.compare_digest(received, expected):
@@ -166,8 +166,7 @@ def webhook():
     event = request.get_json(silent=True) or {}
     data = event.get("data") or {}
     tx_ref = data.get("tx_ref", "")
-    flw_tx_id = data.get("id", "")
-    if tx_ref and flw_tx_id:
-        _settle(tx_ref, str(flw_tx_id))
-    # Always 200 once authenticated so Flutterwave stops retrying a handled event.
+    if tx_ref:
+        _settle(tx_ref, data)
+    # Always 200 once authenticated so the provider stops retrying a handled event.
     return ("", 200)

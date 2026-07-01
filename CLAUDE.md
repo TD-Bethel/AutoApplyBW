@@ -3,10 +3,12 @@
 ## Project Overview
 - **Name**: AutoApply BW — job-application assistant for Batswana / youth in Botswana
 - **Tech Stack**: Python (Flask + Jinja2), sqlite3 (stdlib, no ORM), waitress, fpdf2, pypdf
-- **Self-service billing**: users pay by card (Visa/Mastercard) via Flutterwave
-  hosted checkout (app/billing.py + app/services/payments.py); a verified payment
-  activates the account for SUBSCRIPTION_DAYS. The owner can still activate/suspend
-  accounts manually via /admin as a backstop.
+- **Self-service billing**: users pay by card (Visa/Mastercard) via a hosted
+  checkout (app/billing.py + app/services/payments.py). The gateway is pluggable
+  via PAYMENT_PROVIDER — "dpo" (DPO Pay, the Botswana default, XML API) or
+  "flutterwave" (JSON API); a verified payment activates the account for
+  SUBSCRIPTION_DAYS. The owner can still activate/suspend accounts manually via
+  /admin as a backstop.
 - **Deployment**: Fly.io or Render (Dockerfile + fly.toml / render.yaml)
 
 ## Architecture
@@ -28,10 +30,11 @@
   (`_csrf` + csrf_token()); user-owned rows are checked via _owned_app();
   SMTP values are CR/LF-stripped; secrets live in .env (never commit it).
 - **Payments are verified server-side**: never trust the browser callback's query
-  string or a webhook body alone. Confirm every payment via Flutterwave's verify
-  API and check status + tx_ref + currency + amount against the stored row before
-  granting access; settling is idempotent (tx_ref is unique). The webhook is the
-  only CSRF-exempt endpoint and authenticates via the `verif-hash` secret header.
+  string or a webhook body alone. Confirm every payment via the gateway's verify
+  API (DPO verifyToken / Flutterwave verify) and check status + tx_ref (DPO
+  CompanyRef) + currency + amount against the stored row before granting access;
+  settling is idempotent (tx_ref is unique). The webhook (Flutterwave) is the only
+  CSRF-exempt endpoint and authenticates via the `verif-hash` secret header.
 
 ## Code Style
 - 4-space indentation, snake_case functions, UPPER_SNAKE module constants

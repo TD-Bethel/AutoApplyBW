@@ -50,9 +50,18 @@ def create_app():
         SMTP_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
         SMTP_FROM_NAME=os.getenv("SMTP_FROM_NAME", "AutoApply BW"),
         SEND_RATE_PER_HOUR=_int_env("SEND_RATE_PER_HOUR", 30),
-        # Card payments (Flutterwave hosted checkout). Leave the keys blank to
-        # disable card billing — the billing page then shows a "not available"
-        # notice and admin manual activation remains the only path.
+        # Card payments (hosted checkout). PAYMENT_PROVIDER picks the gateway:
+        # "dpo" (DPO Pay — Botswana default) or "flutterwave". Leave the chosen
+        # provider's keys blank to disable card billing — the billing page then
+        # shows a "not available" notice and admin manual activation is the only
+        # path.
+        PAYMENT_PROVIDER=os.getenv("PAYMENT_PROVIDER", "dpo").strip().lower(),
+        # DPO Pay (Direct Pay Online) — XML API.
+        DPO_COMPANY_TOKEN=os.getenv("DPO_COMPANY_TOKEN", "").strip(),
+        DPO_SERVICE_TYPE=os.getenv("DPO_SERVICE_TYPE", "").strip(),
+        DPO_API_URL=os.getenv("DPO_API_URL", "https://secure.3gdirectpay.com/API/v6/").strip(),
+        DPO_PAY_URL=os.getenv("DPO_PAY_URL", "https://secure.3gdirectpay.com/payv3.php").strip(),
+        # Flutterwave — JSON API.
         FLW_SECRET_KEY=os.getenv("FLW_SECRET_KEY", "").strip(),
         FLW_PUBLIC_KEY=os.getenv("FLW_PUBLIC_KEY", "").strip(),
         FLW_WEBHOOK_HASH=os.getenv("FLW_WEBHOOK_HASH", "").strip(),
