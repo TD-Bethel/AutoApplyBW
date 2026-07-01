@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
     smtp_password TEXT NOT NULL DEFAULT '',
     from_name     TEXT NOT NULL DEFAULT '',
     cv_uploads    INTEGER NOT NULL DEFAULT 0,        -- free-trial upload counter
+    job_searches  INTEGER NOT NULL DEFAULT 0,        -- free-trial job-search counter
     created_at    TEXT NOT NULL
 );
 
@@ -139,6 +140,7 @@ def close_db(exc=None):
 # existing databases (CREATE TABLE IF NOT EXISTS never alters an existing table).
 _MIGRATIONS = [
     ("users", "cv_uploads", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "job_searches", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

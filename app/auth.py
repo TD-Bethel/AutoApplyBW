@@ -65,10 +65,13 @@ def access_active(user):
 
 
 # ------------------------------------------------------------------ free trial
-# New (unpaid) users get a limited trial: whichever of these comes first ends it.
-TRIAL_EMAILS = 2
-TRIAL_UPLOADS = 3
-TRIAL_DAYS = 7
+# New (unpaid) users get a small usage-based trial: 2 free uses of each key
+# action. Once ANY of them is used up the trial is over and the account must
+# subscribe — i.e. the third attempt at anything requires payment.
+TRIAL_EMAILS = 2      # application emails sent
+TRIAL_JOBS = 2        # job searches (browse jobs / see adverts)
+TRIAL_CAREER = 2      # Career Team messages
+TRIAL_UPLOADS = 2     # CV uploads / reviews
 
 
 def _sent_count(user_id):
@@ -77,23 +80,28 @@ def _sent_count(user_id):
     return row["c"] if row else 0
 
 
+def _career_count(user_id):
+    row = query("SELECT COUNT(*) AS c FROM assistant_messages WHERE user_id = ? AND role = 'user'",
+                (user_id,), one=True)
+    return row["c"] if row else 0
+
+
 def trial_state(user):
-    """Trial usage for an unpaid user. Returns a dict with what's left and
-    whether the trial is over, or None for paid/admin users."""
+    """Trial usage for an unpaid user. Returns a dict with what's left of each
+    free action and whether the trial is over, or None for paid/admin users."""
     if user is None or user["role"] == "admin" or access_active(user):
         return None
     sent = _sent_count(user["id"])
+    searches = user["job_searches"] or 0
+    career = _career_count(user["id"])
     uploads = user["cv_uploads"] or 0
-    try:
-        started = datetime.fromisoformat(user["created_at"])
-    except (ValueError, TypeError):
-        started = datetime.now(timezone.utc)
-    days_used = (datetime.now(timezone.utc) - started).days
-    over = (sent >= TRIAL_EMAILS or uploads >= TRIAL_UPLOADS or days_used >= TRIAL_DAYS)
+    over = (sent >= TRIAL_EMAILS or searches >= TRIAL_JOBS
+            or career >= TRIAL_CAREER or uploads >= TRIAL_UPLOADS)
     return {
         "emails_left": max(0, TRIAL_EMAILS - sent),
+        "jobs_left": max(0, TRIAL_JOBS - searches),
+        "career_left": max(0, TRIAL_CAREER - career),
         "uploads_left": max(0, TRIAL_UPLOADS - uploads),
-        "days_left": max(0, TRIAL_DAYS - days_used),
         "over": over,
     }
 

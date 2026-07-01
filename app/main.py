@@ -80,6 +80,12 @@ def jobs():
             flash("Job search is unavailable right now. Please try again later.", "warning")
         if not found and keywords:
             flash("No matching jobs found. Try fewer or different keywords.", "info")
+        # A trial user gets TRIAL_JOBS free searches; paid/admin users aren't
+        # counted. Counting here (only when a search actually ran) is what ends
+        # the browse-jobs part of the trial.
+        if not access_active(g.user) and g.user["role"] != "admin":
+            execute("UPDATE users SET job_searches = job_searches + 1 WHERE id = ?",
+                    (g.user["id"],))
     return render_template(
         "jobs.html",
         vacancy_overview=scraper.overview(per_country=12),
