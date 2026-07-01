@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Test payment, AutoApply BW{% endblock %}
+{% block content %}
+<h1>Test payment</h1>
+
+<div class="notice">
+  <strong>This is a TEST payment</strong> (no real card, no money moves). It
+  stands in for the real gateway so you can try the subscription flow. Turn it
+  off by setting <code>PAYMENT_PROVIDER</code> to <code>dpo</code> or
+  <code>flutterwave</code> with real keys.
+</div>
+
+<div class="card">
+  <h2>Full access — {{ payment['currency'] }} {{ '%.2f'|format(payment['amount']) }} for {{ payment['days'] }} days</h2>
+  <p class="muted">Reference: {{ payment['tx_ref'] }}</p>
+  <div class="row" style="align-items:center;gap:0.6rem">
+    <form method="post" action="{{ url_for('billing.mock_confirm') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="tx_ref" value="{{ payment['tx_ref'] }}">
+      <input type="hidden" name="result" value="success">
+      <button type="submit" class="btn">Simulate successful payment</button>
+    </form>
+    <form method="post" action="{{ url_for('billing.mock_confirm') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="tx_ref" value="{{ payment['tx_ref'] }}">
+      <input type="hidden" name="result" value="cancel">
+      <button type="submit" class="btn secondary">Cancel</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

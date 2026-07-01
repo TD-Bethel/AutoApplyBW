@@ -36,7 +36,10 @@ def provider(config):
 
 def configured(config):
     """True when the chosen provider has its credentials set."""
-    if provider(config) == "flutterwave":
+    p = provider(config)
+    if p == "mock":
+        return True   # test mode needs no credentials
+    if p == "flutterwave":
         return bool(config.get("FLW_SECRET_KEY"))
     return bool(config.get("DPO_COMPANY_TOKEN"))
 
@@ -61,7 +64,10 @@ def verify(config, payment, request_args):
     """Return True iff the gateway confirms `payment` is genuinely paid for at
     least its amount in its currency. `request_args` is the callback query (or a
     webhook body). All provider-specific matching lives in the helpers."""
-    if provider(config) == "flutterwave":
+    p = provider(config)
+    if p == "mock":
+        return True   # test mode: the internal confirm page stands in for a gateway
+    if p == "flutterwave":
         return _flw_verify(config, payment, request_args)
     return _dpo_verify(config, payment, request_args)
 

@@ -15,7 +15,7 @@ import secrets
 from datetime import date, timedelta
 
 from flask import (Blueprint, render_template, request, redirect, url_for,
-                   flash, g, current_app)
+                   flash, g, current_app, abort)
 
 from .auth import login_required, access_active
 from .db import query, execute, now_iso
@@ -73,6 +73,9 @@ def checkout():
         " VALUES (?, ?, ?, ?, ?, 'pending', ?)",
         (g.user["id"], tx_ref, amount, currency, days, now_iso()),
     )
+    # Test mode: skip the external gateway and use the internal confirm page.
+    if payments.provider(cfg) == "mock":
+        return redirect(url_for("billing.mock_pay", tx_ref=tx_ref))
     try:
         checkout_url, provider_ref = payments.create_checkout(
             cfg, tx_ref=tx_ref, amount=amount, currency=currency,
@@ -150,6 +153,41 @@ def callback():
     else:
         flash("Payment was not completed. If you were charged but still see this, "
               "contact support and we'll sort it out.", "warning")
+    return redirect(url_for("main.dashboard"))
+
+
+@bp.route("/mock")
+@login_required
+def mock_pay():
+    """Test-only stand-in for a gateway's hosted page (PAYMENT_PROVIDER=mock)."""
+    if payments.provider(current_app.config) != "mock":
+        abort(404)
+    payment = query(
+        "SELECT * FROM payments WHERE tx_ref = ? AND user_id = ?",
+        (request.args.get("tx_ref", ""), g.user["id"]), one=True,
+    )
+    if payment is None or payment["status"] != "pending":
+        flash("That payment is no longer available.", "warning")
+        return redirect(url_for("billing.index"))
+    return render_template("billing_mock.html", payment=payment)
+
+
+@bp.route("/mock/confirm", methods=["POST"])
+@login_required
+def mock_confirm():
+    """Simulate a successful (or cancelled) test payment."""
+    if payments.provider(current_app.config) != "mock":
+        abort(404)
+    tx_ref = request.form.get("tx_ref", "")
+    payment = query("SELECT * FROM payments WHERE tx_ref = ? AND user_id = ?",
+                    (tx_ref, g.user["id"]), one=True)
+    if payment is None:
+        abort(404)
+    if request.form.get("result") == "success" and _settle(tx_ref, request.form):
+        flash("Test payment successful — your account is now active. Thank you!", "success")
+    else:
+        execute("UPDATE payments SET status = 'failed' WHERE tx_ref = ? AND status = 'pending'", (tx_ref,))
+        flash("Test payment cancelled.", "info")
     return redirect(url_for("main.dashboard"))
 
 
