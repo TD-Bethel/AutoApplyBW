@@ -488,12 +488,69 @@ _RSS_SOURCES = [
 # the Jobs page as direct "apply on their site" links; they are NEVER fetched.
 # Add a dict here to surface another employer's careers page the same way.
 EMPLOYER_DIRECTORY = [
-    {"name": "Access Bank Botswana", "country": "BW",
+    # --- Botswana --------------------------------------------------------
+    {"name": "Access Bank Botswana", "country": "BW", "sector": "Bank",
      "url": "https://careers.accessbankplc.com/jobs",
-     "note": "Group careers portal (Workable) — filter the list for Botswana roles."},
-    {"name": "Bank of Baroda (Botswana)", "country": "BW",
+     "note": "Group careers portal (Workable) — filter for Botswana roles."},
+    {"name": "Bank of Baroda (Botswana)", "country": "BW", "sector": "Bank",
      "url": "https://www.bankofbaroda.co.bw/about-us/careers",
-     "note": "Current vacancies are posted on the bank's own careers page."},
+     "note": "Vacancies are posted on the bank's own careers page."},
+    {"name": "Armstrongs Attorneys", "country": "BW", "sector": "Law firm", "url": "https://armstrongs.bw"},
+    {"name": "Bookbinder Business Law", "country": "BW", "sector": "Law firm", "url": "https://bookbinderlaw.co.bw"},
+    {"name": "Desai Law Group", "country": "BW", "sector": "Law firm", "url": "https://desailawgroup.co.bw"},
+    {"name": "Amaseng Attorneys", "country": "BW", "sector": "Law firm", "url": "https://www.amasenglaw.com"},
+    {"name": "AJA Attorneys", "country": "BW", "sector": "Law firm", "url": "https://www.aja.co.bw"},
+    {"name": "Adombotha", "country": "BW", "sector": "Law firm", "url": "https://www.adombotha.co.bw"},
+    {"name": "Dinge Malume", "country": "BW", "sector": "Law firm", "url": "https://www.dingemalume.com"},
+    {"name": "Minchin & Kelly (DLA Piper Africa)", "country": "BW", "sector": "Law firm", "url": "https://www.dlapiperafrica.com/en/botswana"},
+    {"name": "Dube & Partners", "country": "BW", "sector": "Law firm", "url": "https://www.dubeandpartners.co.bw"},
+    {"name": "Oberholster", "country": "BW", "sector": "Law firm", "url": "https://www.oberholster.co.bw"},
+    {"name": "Khan", "country": "BW", "sector": "Law firm", "url": "https://www.khan.co.bw"},
+    {"name": "Bowman (Botswana)", "country": "BW", "sector": "Law firm", "url": "https://www.bowman.co.bw"},
+    {"name": "Law Society of Botswana — firm directory", "country": "BW", "sector": "Legal directory", "url": "https://lawsociety.org.bw/law-firm-directory"},
+    {"name": "Botswana Law Firms Database", "country": "BW", "sector": "Legal directory", "url": "https://www.laws.co.bw/law-firms-directory"},
+    {"name": "Government of Botswana — jobs portal", "country": "BW", "sector": "Government", "url": "https://www.gov.bw"},
+
+    # --- Namibia ---------------------------------------------------------
+    {"name": "Engling, Stritter & Partners", "country": "NA", "sector": "Law firm", "url": "https://www.englinglaw.com.na"},
+    {"name": "Snyman Attorneys", "country": "NA", "sector": "Law firm", "url": "https://www.snymanlaw.com.na"},
+    {"name": "Kloppers Legal Practitioners", "country": "NA", "sector": "Law firm", "url": "https://www.kloppers.com.na"},
+    {"name": "C du Plessis Attorneys", "country": "NA", "sector": "Law firm", "url": "https://www.cduplessisattorneys.com.na"},
+    {"name": "Law Chambers Namibia", "country": "NA", "sector": "Law firm", "url": "https://www.lawchambersnamibia.com.na"},
+    {"name": "Namibia Law Firm", "country": "NA", "sector": "Law firm", "url": "https://www.namibialawfirm.com.na"},
+    {"name": "Elisenheim Law", "country": "NA", "sector": "Law firm", "url": "https://www.elisenheimlaw.com.na"},
+    {"name": "ESI Attorneys (DLA Piper Africa)", "country": "NA", "sector": "Law firm", "url": "https://www.dlapiperafrica.com/en/namibia"},
+    {"name": "Law Society of Namibia", "country": "NA", "sector": "Legal directory", "url": "https://www.lawsocietynamibia.org.na"},
+    {"name": "Namibia e-Government portal", "country": "NA", "sector": "Government", "url": "https://www.eservice.gov.na"},
+
+    # --- Zambia ----------------------------------------------------------
+    {"name": "Corpus Legal Practitioners", "country": "ZM", "sector": "Law firm", "url": "https://corpus.co.zm"},
+    {"name": "Chibesakunda & Co.", "country": "ZM", "sector": "Law firm", "url": "https://www.chibesakunda.com"},
+    {"name": "Musa Dudhia & Co.", "country": "ZM", "sector": "Law firm", "url": "https://musadudhia.com"},
+    {"name": "Mulenga Mundashi Legal Practitioners", "country": "ZM", "sector": "Law firm", "url": "https://mmlp.co.zm"},
+    {"name": "Equitas Legal Practitioners", "country": "ZM", "sector": "Law firm", "url": "https://equitas.co.zm"},
+    {"name": "Eric Silwamba, Jalasi & Linyama", "country": "ZM", "sector": "Law firm", "url": "https://www.esjlawoffice.com"},
+    {"name": "AMILAW", "country": "ZM", "sector": "Law firm", "url": "https://www.amilaw.co.zm"},
+    {"name": "Cavendish Partners", "country": "ZM", "sector": "Law firm", "url": "https://www.cavendishpartners.co.zm"},
+    {"name": "MMB Advocates", "country": "ZM", "sector": "Law firm", "url": "https://www.mmbadvocates.com"},
+    {"name": "Law Association of Zambia", "country": "ZM", "sector": "Legal directory", "url": "https://www.lawsocietyzambia.org"},
+
+    # --- South Africa ----------------------------------------------------
+    {"name": "Webber Wentzel", "country": "ZA", "sector": "Law firm", "url": "https://www.webberwentzel.com"},
+    {"name": "ENSafrica", "country": "ZA", "sector": "Law firm", "url": "https://www.ensafrica.com"},
+    {"name": "Cliffe Dekker Hofmeyr", "country": "ZA", "sector": "Law firm", "url": "https://www.cliffedekkerhofmeyr.com"},
+    {"name": "Bowmans", "country": "ZA", "sector": "Law firm", "url": "https://www.bowmanslaw.com"},
+    {"name": "Fasken", "country": "ZA", "sector": "Law firm", "url": "https://www.fasken.com"},
+    {"name": "Herbert Smith Freehills", "country": "ZA", "sector": "Law firm", "url": "https://www.herbertsmithfreehills.com"},
+    {"name": "Norton Rose Fulbright (SA)", "country": "ZA", "sector": "Law firm", "url": "https://www.nortonrosefulbright.com"},
+    {"name": "Werksmans Attorneys", "country": "ZA", "sector": "Law firm", "url": "https://www.werksmans.com"},
+    {"name": "Adams & Adams", "country": "ZA", "sector": "Law firm", "url": "https://www.adams.africa"},
+    {"name": "Spoor & Fisher", "country": "ZA", "sector": "Law firm", "url": "https://spoor.com"},
+    {"name": "Shepstone & Wylie", "country": "ZA", "sector": "Law firm", "url": "https://www.shepstonewylie.co.za"},
+    {"name": "Baker McKenzie (SA)", "country": "ZA", "sector": "Law firm", "url": "https://www.bakermckenzie.com"},
+    {"name": "Pnet", "country": "ZA", "sector": "Job portal", "url": "https://www.pnet.co.za"},
+    {"name": "Careers24", "country": "ZA", "sector": "Job portal", "url": "https://www.careers24.com"},
+    {"name": "Government of South Africa — vacancies", "country": "ZA", "sector": "Government", "url": "https://www.gov.za"},
 ]
 
 

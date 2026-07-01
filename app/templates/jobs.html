@@ -106,17 +106,23 @@ Advert: {{ j.url }}{% endif %}">
 {% if directory %}
 <div class="card">
   <h2>Apply directly at these employers</h2>
-  <p class="muted">These companies post jobs on their own portals, which we can't
-    list automatically. Open their careers page to see and apply for current roles.</p>
-  <ul>
-    {% for e in directory %}
-    <li>
-      <a href="{{ e.url }}" target="_blank" rel="noopener noreferrer">{{ e.name }}</a>
-      {% if e.country and countries.get(e.country) %}<span class="badge">{{ countries[e.country] }}</span>{% endif %}
-      {% if e.note %}<span class="muted"> — {{ e.note }}</span>{% endif %}
-    </li>
-    {% endfor %}
-  </ul>
+  <p class="muted">These employers and firms post jobs on their own sites, which we
+    can't list automatically. Open one to see and apply for current roles.</p>
+  {% for code, cname in countries.items() %}
+    {% set group = directory | selectattr('country', 'equalto', code) | list %}
+    {% if group %}
+    <h3 class="overview-title">{{ cname }}</h3>
+    <ul>
+      {% for e in group %}
+      <li>
+        <a href="{{ e.url }}" target="_blank" rel="noopener noreferrer">{{ e.name }}</a>
+        {% if e.sector %}<span class="badge">{{ e.sector }}</span>{% endif %}
+        {% if e.note %}<span class="muted"> — {{ e.note }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  {% endfor %}
 </div>
 {% endif %}
 {% endblock %}
