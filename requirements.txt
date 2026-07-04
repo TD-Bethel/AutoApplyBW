@@ -8,3 +8,6 @@ waitress>=3.0
 # is set; SQLite installs never import it. Enables running many app instances
 # against one shared Postgres for high-scale, high-availability deployments.
 pg8000>=1.30
+# Error tracking (pure Python). Only activated when SENTRY_DSN is set; the app
+# runs fine without the package or the DSN (lazy import in app/observability.py).
+sentry-sdk>=2.0

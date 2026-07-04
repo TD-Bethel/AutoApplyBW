@@ -53,5 +53,11 @@ services:
         sync: false                  # set in the Render dashboard
       - key: ADMIN_PASSWORD
         sync: false                  # set in the Render dashboard
+      # Observability: JSON request logs for Render's log stream, and Sentry
+      # error tracking (paste your project DSN in the dashboard; blank = off).
+      - key: LOG_JSON
+        value: "1"
+      - key: SENTRY_DSN
+        sync: false
       # AI features work offline (rule-based fallback) with no key set.
       # To use the Claude API instead, add ANTHROPIC_API_KEY in the dashboard.
