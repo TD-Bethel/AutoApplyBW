@@ -22,11 +22,22 @@ def create_app():
     load_dotenv()
     app = Flask(__name__, instance_relative_config=False)
 
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    multi_instance = database_url.startswith(("postgres://", "postgresql://"))
+
     secret_key = os.getenv("SECRET_KEY", "").strip()
     if not secret_key or secret_key in ("dev-insecure-change-me",
                                         "please-change-this-to-a-long-random-string"):
-        # Never run with a known/guessable secret. A random one keeps the app
-        # safe (sessions just reset on restart) until SECRET_KEY is set.
+        if multi_instance:
+            # With Postgres you run several instances; a per-instance random key
+            # would invalidate every other instance's sessions. Fail fast so this
+            # is never silently broken in production.
+            raise RuntimeError(
+                "SECRET_KEY must be set to a fixed value when DATABASE_URL "
+                "(Postgres / multi-instance) is configured."
+            )
+        # Single-box/dev: a random key keeps the app safe (sessions just reset on
+        # restart) until SECRET_KEY is set.
         secret_key = secrets.token_hex(32)
         app.logger.warning(
             "SECRET_KEY is not set in .env — using a temporary random key. "
@@ -36,6 +47,9 @@ def create_app():
     app.config.update(
         SECRET_KEY=secret_key,
         DATABASE_PATH=os.getenv("DATABASE_PATH", "instance/autoapply.db"),
+        # Set DATABASE_URL (postgres://...) to run on Postgres instead of SQLite —
+        # required to scale out to multiple app instances. See app/db.py.
+        DATABASE_URL=database_url,
         ANTHROPIC_API_KEY=os.getenv("ANTHROPIC_API_KEY", "").strip(),
         ANTHROPIC_MODEL=os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8").strip(),
         DEEPSEEK_API_KEY=os.getenv("DEEPSEEK_API_KEY", "").strip(),

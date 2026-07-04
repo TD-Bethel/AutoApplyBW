@@ -1,11 +1,24 @@
-"""Thin SQLite data layer (stdlib only, no ORM).
+"""Thin SQL data layer (no ORM), with two interchangeable backends:
 
-Kept dependency-free on purpose so the app installs and runs on any Python
-version without compiling native wheels.
+  - SQLite (default) — a local file. Zero-setup for dev, tests and small single-
+    box deployments. Uses stdlib `sqlite3` only.
+  - PostgreSQL — used when DATABASE_URL is set (postgres://...). This is what lets
+    the app run as MANY stateless instances behind a load balancer against one
+    shared, durable, highly-available database — the path to serving large user
+    counts. The driver is `pg8000` (PURE PYTHON, no native wheels) so it still
+    honours the dependency-light rule.
+
+Every route goes through query()/execute() here, so the rest of the app is
+identical on both backends. Two small differences are handled centrally:
+  - placeholders: our SQL uses '?'; Postgres wants '%s' (translated in _pg_sql).
+  - rows: SQLite yields dict-like sqlite3.Row; for Postgres we build dicts, so
+    callers can keep using row["column"] unchanged.
 """
 import os
+import re
 import sqlite3
 from datetime import datetime, timezone
+from urllib.parse import urlparse, parse_qs, unquote
 from flask import g, current_app
 
 SCHEMA = """
@@ -115,18 +128,64 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _database_url():
+    return (current_app.config.get("DATABASE_URL") or "").strip()
+
+
+def using_postgres():
+    return _database_url().startswith(("postgres://", "postgresql://"))
+
+
+def _pg_sql(sql):
+    """Translate our SQLite-style SQL to what pg8000 expects: escape any literal
+    '%' then swap '?' placeholders for '%s'. (Our SQL contains no '%' literals,
+    but escaping keeps this safe if that ever changes.)"""
+    return sql.replace("%", "%%").replace("?", "%s")
+
+
+def _connect_postgres(url):
+    # Imported lazily so SQLite-only installs never need pg8000 present.
+    import ssl
+    import pg8000.dbapi
+
+    parts = urlparse(url)
+    params = parse_qs(parts.query)
+    sslmode = (params.get("sslmode", ["require"])[0]).lower()
+    # Managed Postgres (Neon/Supabase/Render) requires TLS; allow opting out for
+    # a local server with sslmode=disable.
+    ssl_context = None if sslmode in ("disable", "allow") else ssl.create_default_context()
+    conn = pg8000.dbapi.connect(
+        user=unquote(parts.username or "postgres"),
+        password=unquote(parts.password or ""),
+        host=parts.hostname or "localhost",
+        port=parts.port or 5432,
+        database=(parts.path or "/").lstrip("/") or "postgres",
+        ssl_context=ssl_context,
+    )
+    # Autocommit: every statement commits on its own, matching the SQLite helpers'
+    # commit-per-write behaviour and avoiding idle-in-transaction connections.
+    conn.autocommit = True
+    return conn
+
+
 def get_db():
     if "db" not in g:
-        path = current_app.config["DATABASE_PATH"]
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        g.db = sqlite3.connect(path)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys = ON")
-        # WAL lets readers proceed while a write is in flight — the main
-        # concurrency ceiling for SQLite under multi-user load. busy_timeout
-        # makes brief write contention wait instead of erroring.
-        g.db.execute("PRAGMA journal_mode = WAL")
-        g.db.execute("PRAGMA busy_timeout = 5000")
+        if using_postgres():
+            g.db = _connect_postgres(_database_url())
+            g._pg = True
+        else:
+            path = current_app.config["DATABASE_PATH"]
+            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+            conn = sqlite3.connect(path)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            # WAL lets readers proceed while a write is in flight — the main
+            # concurrency ceiling for SQLite under multi-user load. busy_timeout
+            # makes brief write contention wait instead of erroring.
+            conn.execute("PRAGMA journal_mode = WAL")
+            conn.execute("PRAGMA busy_timeout = 5000")
+            g.db = conn
+            g._pg = False
     return g.db
 
 
@@ -145,6 +204,12 @@ _MIGRATIONS = [
 
 
 def _migrate(db):
+    if g.get("_pg"):
+        cur = db.cursor()
+        for table, column, decl in _MIGRATIONS:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {decl}")
+        cur.close()
+        return
     for table, column, decl in _MIGRATIONS:
         cols = {r["name"] for r in db.execute(f"PRAGMA table_info({table})")}
         if column not in cols:
@@ -153,13 +218,36 @@ def _migrate(db):
 
 def init_db():
     db = get_db()
-    db.executescript(SCHEMA)
+    if g.get("_pg"):
+        # SERIAL/BIGSERIAL is Postgres's auto-increment; run each statement on its
+        # own (pg8000 executes one at a time, unlike sqlite's executescript).
+        # Strip -- comments FIRST: some contain ';' which would otherwise split a
+        # CREATE TABLE mid-definition. (Our DDL has no '--' inside string literals.)
+        schema = SCHEMA.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
+        schema = re.sub(r"--[^\n]*", "", schema)
+        cur = db.cursor()
+        for stmt in schema.split(";"):
+            if stmt.strip():
+                cur.execute(stmt)
+        cur.close()
+    else:
+        db.executescript(SCHEMA)
     _migrate(db)
-    db.commit()
+    if not g.get("_pg"):
+        db.commit()
 
 
 def query(sql, args=(), one=False):
-    cur = get_db().execute(sql, args)
+    db = get_db()
+    if g.get("_pg"):
+        cur = db.cursor()
+        cur.execute(_pg_sql(sql), args)
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description] if cur.description else []
+        cur.close()
+        dicts = [dict(zip(cols, r)) for r in rows]
+        return (dicts[0] if dicts else None) if one else dicts
+    cur = db.execute(sql, args)
     rows = cur.fetchall()
     cur.close()
     return (rows[0] if rows else None) if one else rows
@@ -167,6 +255,11 @@ def query(sql, args=(), one=False):
 
 def execute(sql, args=()):
     db = get_db()
+    if g.get("_pg"):
+        cur = db.cursor()
+        cur.execute(_pg_sql(sql), args)  # autocommit is on
+        cur.close()
+        return None  # callers never use the return value
     cur = db.execute(sql, args)
     db.commit()
     last_id = cur.lastrowid

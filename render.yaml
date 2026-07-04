@@ -1,66 +1,57 @@
-# Render Blueprint — deploy AutoApply BW.
+# Render Blueprint — deploy AutoApply BW to scale.
 # In Render: New + -> Blueprint -> connect this repo. Render reads this file and
-# prompts you for the values marked `sync: false` (admin login + payment keys).
+# prompts for the values marked `sync: false` (admin login).
 #
-# IMPORTANT — data persistence:
-#   On the FREE plan the disk is EPHEMERAL: the SQLite database (users, CVs,
-#   applications, PAYMENTS) is wiped on every redeploy/restart, and the service
-#   sleeps after ~15 min idle. That is fine to trial the deploy, but NOT for a
-#   live app taking card payments — paying users would lose their access.
-#   To run for real, switch to the persistent setup: see the commented block at
-#   the bottom (plan: starter + a Render Disk + DATABASE_PATH on it).
+# This blueprint is built for MANY users, not a demo:
+#   - a managed PostgreSQL database (durable + highly available), so
+#   - the web service can run as MULTIPLE stateless instances behind Render's
+#     load balancer (numInstances), with no shared local disk.
+# The app auto-detects DATABASE_URL and uses Postgres (see app/db.py); with it
+# unset it would fall back to a local SQLite file.
+
+databases:
+  - name: autoapply-db
+    databaseName: autoapply
+    user: autoapply
+    # Free Postgres is fine to start but is capped and expires — move to a paid
+    # plan (and enable High Availability) before a real launch. Size the plan to
+    # your load; connection-heavy apps should use the POOLED connection string.
+    plan: free
+
 services:
   - type: web
     name: autoapply-bw
     runtime: python
-    plan: free
+    # Starter+ is required to run more than one instance. Bump numInstances (and
+    # the plan) as traffic grows — this is the horizontal-scaling knob. Render's
+    # load balancer spreads requests across them automatically.
+    plan: starter
+    numInstances: 2
     buildCommand: pip install -r requirements.txt
     startCommand: python run.py --serve
+    healthCheckPath: /login          # a cheap, always-200 page for health checks
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.5"
       - key: HOST
-        value: "0.0.0.0"          # Render provides PORT; run.py reads both
+        value: "0.0.0.0"             # Render provides PORT; run.py reads both
       - key: COOKIE_SECURE
-        value: "1"                # Render serves HTTPS -> secure cookies + HSTS
+        value: "1"                   # Render serves HTTPS -> secure cookies + HSTS
+      # Shared across all instances + stable across deploys — essential so a
+      # session cookie signed by one instance is trusted by the others.
       - key: SECRET_KEY
-        generateValue: true       # Render generates a strong random value
+        generateValue: true
+      # Wire the app to Postgres. Sessions are signed cookies (stateless), so no
+      # sticky sessions are needed once every instance shares this DB + SECRET_KEY.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: autoapply-db
+          property: connectionString
+      - key: WAITRESS_THREADS
+        value: "16"                  # per-instance thread pool (I/O-bound requests)
       - key: ADMIN_EMAIL
-        sync: false               # set in the Render dashboard
+        sync: false                  # set in the Render dashboard
       - key: ADMIN_PASSWORD
-        sync: false               # set in the Render dashboard
-
-      # ---- Card payments (Flutterwave) ------------------------------------
-      # Paste your LIVE (or TEST) keys in the dashboard when prompted. Leave
-      # them blank to launch without card billing (admin can activate manually).
-      - key: FLW_SECRET_KEY
-        sync: false
-      - key: FLW_PUBLIC_KEY
-        sync: false
-      - key: FLW_WEBHOOK_HASH       # the "Secret hash" from FLW Settings -> Webhooks;
-        sync: false                 # point the webhook at https://<your-app>.onrender.com/billing/webhook
-      - key: SUBSCRIPTION_PRICE_BWP
-        value: "50"
-      - key: SUBSCRIPTION_CURRENCY
-        value: "BWP"
-      - key: SUBSCRIPTION_DAYS
-        value: "30"
-
+        sync: false                  # set in the Render dashboard
       # AI features work offline (rule-based fallback) with no key set.
       # To use the Claude API instead, add ANTHROPIC_API_KEY in the dashboard.
-
-# ---------------------------------------------------------------------------
-# GO-LIVE (persistent) configuration. When you're ready to take real payments,
-# replace `plan: free` above with `plan: starter`, add the disk + DATABASE_PATH
-# below, and redeploy. The SQLite DB then lives on the disk and survives
-# redeploys; the service also stops sleeping. (~$7/mo instance + ~$0.25/GB/mo.)
-#
-#    plan: starter
-#    disk:
-#      name: data
-#      mountPath: /var/data
-#      sizeGB: 1
-#    envVars:
-#      - key: DATABASE_PATH
-#        value: "/var/data/autoapply.db"
-# ---------------------------------------------------------------------------

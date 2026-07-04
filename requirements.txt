@@ -4,3 +4,7 @@ requests>=2.31
 pypdf>=4.0
 fpdf2>=2.8
 waitress>=3.0
+# Pure-Python PostgreSQL driver (no native wheels). Only used when DATABASE_URL
+# is set; SQLite installs never import it. Enables running many app instances
+# against one shared Postgres for high-scale, high-availability deployments.
+pg8000>=1.30

@@ -2,7 +2,10 @@
 
 ## Project Overview
 - **Name**: AutoApply BW — job-application assistant for Batswana / youth in Botswana
-- **Tech Stack**: Python (Flask + Jinja2), sqlite3 (stdlib, no ORM), waitress, fpdf2, pypdf
+- **Tech Stack**: Python (Flask + Jinja2), waitress, fpdf2, pypdf. Data layer is
+  dual-backend (app/db.py, no ORM): sqlite3 (stdlib) by default; PostgreSQL via
+  pg8000 (pure Python) when DATABASE_URL is set — the latter lets the app run as
+  many stateless instances behind a load balancer for scale/HA.
 - **Free for everyone**: no payment or trial — any logged-in user gets the full
   app (feature_access() in app/auth.py is always true). The owner can still
   suspend/activate accounts via /admin. (Card-payment support — DPO Pay /
