@@ -3,40 +3,6 @@
 {% block content %}
 <h1>Welcome, {{ g.user['full_name'] or g.user['email'] }}</h1>
 
-{% macro pay_cta() %}
-  <p class="pay-cta">
-    <a class="btn" href="{{ url_for('billing.index') }}">Pay by card to unlock full access</a>
-  </p>
-{% endmacro %}
-
-{% if trial and not trial.over %}
-  <div class="notice notice-trial">
-    <strong>Free trial active.</strong>
-    You can try the full system. Remaining:
-    <strong>{{ trial.emails_left }}</strong> email(s),
-    <strong>{{ trial.jobs_left }}</strong> job search(es),
-    <strong>{{ trial.career_left }}</strong> Career Team message(s),
-    <strong>{{ trial.uploads_left }}</strong> CV upload(s) — whichever runs out first.
-    Pay by card to unlock unlimited access instantly.
-    {{ pay_cta() }}
-  </div>
-{% elif trial and trial.over %}
-  <div class="notice">
-    <strong>Your free trial has ended.</strong>
-    You can still view your data, but CV tailoring, job search, and sending are
-    locked. Pay by card to unlock full access instantly.
-    {{ pay_cta() }}
-  </div>
-{% elif not is_active %}
-  <div class="notice">
-    <strong>Your account is pending activation.</strong>
-    Pay by card to unlock CV tailoring and sending instantly.
-    You can still set up your profile in
-    <a href="{{ url_for('main.settings') }}">Settings</a>.
-    {{ pay_cta() }}
-  </div>
-{% endif %}
-
 {# ---------------- CV section ---------------- #}
 <div class="card">
   <h2>1. Your CV</h2>

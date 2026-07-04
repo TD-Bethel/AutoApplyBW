@@ -61,9 +61,7 @@ def dashboard():
 @bp.route("/jobs")
 @login_required
 def jobs():
-    """Dedicated Jobs page: browse currently-available vacancies and search.
-    Browsing is open to any logged-in user; running a search is a full-access
-    feature (paid or in-trial), matching the dashboard's Find-jobs gating."""
+    """Dedicated Jobs page: browse currently-available vacancies and search."""
     scraper.warm_async()  # fill the vacancy cache in the background
     keywords = request.args.get("keywords", "").strip()[:MAX_FIELD]
     location = request.args.get("location", "").strip()[:MAX_FIELD]
@@ -71,7 +69,7 @@ def jobs():
     if country not in scraper.COUNTRIES:
         country = ""  # "" = all countries
     found = None  # None = no search run yet; [] = searched, nothing matched
-    if (keywords or location or country) and feature_access(g.user):
+    if keywords or location or country:
         try:
             found = scraper.search(keywords=keywords, location=location, country=country)
         except Exception:  # noqa: BLE001 — search must never 500 the page
@@ -80,12 +78,6 @@ def jobs():
             flash("Job search is unavailable right now. Please try again later.", "warning")
         if not found and keywords:
             flash("No matching jobs found. Try fewer or different keywords.", "info")
-        # A trial user gets TRIAL_JOBS free searches; paid/admin users aren't
-        # counted. Counting here (only when a search actually ran) is what ends
-        # the browse-jobs part of the trial.
-        if not access_active(g.user) and g.user["role"] != "admin":
-            execute("UPDATE users SET job_searches = job_searches + 1 WHERE id = ?",
-                    (g.user["id"],))
     return render_template(
         "jobs.html",
         vacancy_overview=scraper.overview(per_country=12),

@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
 from . import db
-from .security import csrf_protect, csrf_token, csrf_exempt
+from .security import csrf_protect, csrf_token
 
 
 def _int_env(name, default):
@@ -50,24 +50,6 @@ def create_app():
         SMTP_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
         SMTP_FROM_NAME=os.getenv("SMTP_FROM_NAME", "AutoApply BW"),
         SEND_RATE_PER_HOUR=_int_env("SEND_RATE_PER_HOUR", 30),
-        # Card payments (hosted checkout). PAYMENT_PROVIDER picks the gateway:
-        # "dpo" (DPO Pay — Botswana default) or "flutterwave". Leave the chosen
-        # provider's keys blank to disable card billing — the billing page then
-        # shows a "not available" notice and admin manual activation is the only
-        # path.
-        PAYMENT_PROVIDER=os.getenv("PAYMENT_PROVIDER", "dpo").strip().lower(),
-        # DPO Pay (Direct Pay Online) — XML API.
-        DPO_COMPANY_TOKEN=os.getenv("DPO_COMPANY_TOKEN", "").strip(),
-        DPO_SERVICE_TYPE=os.getenv("DPO_SERVICE_TYPE", "").strip(),
-        DPO_API_URL=os.getenv("DPO_API_URL", "https://secure.3gdirectpay.com/API/v6/").strip(),
-        DPO_PAY_URL=os.getenv("DPO_PAY_URL", "https://secure.3gdirectpay.com/payv3.php").strip(),
-        # Flutterwave — JSON API.
-        FLW_SECRET_KEY=os.getenv("FLW_SECRET_KEY", "").strip(),
-        FLW_PUBLIC_KEY=os.getenv("FLW_PUBLIC_KEY", "").strip(),
-        FLW_WEBHOOK_HASH=os.getenv("FLW_WEBHOOK_HASH", "").strip(),
-        SUBSCRIPTION_PRICE_BWP=os.getenv("SUBSCRIPTION_PRICE_BWP", "50").strip(),
-        SUBSCRIPTION_CURRENCY=os.getenv("SUBSCRIPTION_CURRENCY", "BWP").strip(),
-        SUBSCRIPTION_DAYS=_int_env("SUBSCRIPTION_DAYS", 30),
         MAX_CONTENT_LENGTH=10 * 1024 * 1024,  # 10 MB upload cap
         # Session-cookie hardening
         SESSION_COOKIE_HTTPONLY=True,
@@ -100,18 +82,12 @@ def create_app():
     from .admin import bp as admin_bp
     from .assistants import bp as assistants_bp
     from .support import bp as support_bp
-    from .billing import bp as billing_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(assistants_bp)
     app.register_blueprint(support_bp)
-    app.register_blueprint(billing_bp)
-
-    # The payment provider's webhook proves itself with a signed header, not a
-    # session CSRF token, so it must be exempt from the global CSRF check.
-    csrf_exempt("billing.webhook")
 
     with app.app_context():
         db.init_db()

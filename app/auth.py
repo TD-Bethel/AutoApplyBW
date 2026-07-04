@@ -64,57 +64,21 @@ def access_active(user):
     return True
 
 
-# ------------------------------------------------------------------ free trial
-# New (unpaid) users get a small usage-based trial: 2 free uses of each key
-# action. Once ANY of them is used up the trial is over and the account must
-# subscribe — i.e. the third attempt at anything requires payment.
-TRIAL_EMAILS = 2      # application emails sent
-TRIAL_JOBS = 2        # job searches (browse jobs / see adverts)
-TRIAL_CAREER = 2      # Career Team messages
-TRIAL_UPLOADS = 2     # CV uploads / reviews
-
-
-def _sent_count(user_id):
-    row = query("SELECT COUNT(*) AS c FROM applications WHERE user_id = ? AND status = 'sent'",
-                (user_id,), one=True)
-    return row["c"] if row else 0
-
-
-def _career_count(user_id):
-    row = query("SELECT COUNT(*) AS c FROM assistant_messages WHERE user_id = ? AND role = 'user'",
-                (user_id,), one=True)
-    return row["c"] if row else 0
-
-
+# ------------------------------------------------------------------ access
+# The app is FREE for everyone — there is no trial or subscription. These helpers
+# stay (returning "no trial" / "full access") so the routes and templates that
+# call them keep working without change.
 def trial_state(user):
-    """Trial usage for an unpaid user. Returns a dict with what's left of each
-    free action and whether the trial is over, or None for paid/admin users."""
-    if user is None or user["role"] == "admin" or access_active(user):
-        return None
-    sent = _sent_count(user["id"])
-    searches = user["job_searches"] or 0
-    career = _career_count(user["id"])
-    uploads = user["cv_uploads"] or 0
-    over = (sent >= TRIAL_EMAILS or searches >= TRIAL_JOBS
-            or career >= TRIAL_CAREER or uploads >= TRIAL_UPLOADS)
-    return {
-        "emails_left": max(0, TRIAL_EMAILS - sent),
-        "jobs_left": max(0, TRIAL_JOBS - searches),
-        "career_left": max(0, TRIAL_CAREER - career),
-        "uploads_left": max(0, TRIAL_UPLOADS - uploads),
-        "over": over,
-    }
+    return None
 
 
 def trial_active(user):
-    """True if an unpaid user is still inside their free trial."""
-    state = trial_state(user)
-    return bool(state) and not state["over"]
+    return False
 
 
 def feature_access(user):
-    """May this user use the paid/key features right now? (paid OR in trial)."""
-    return access_active(user) or trial_active(user)
+    """Free for all: any logged-in user gets the full app."""
+    return user is not None
 
 
 def login_required(view):
@@ -185,8 +149,7 @@ def register():
                    VALUES (?, ?, ?, ?, 'user', 'pending', ?)""",
                 (email, generate_password_hash(password), full_name, phone, now_iso()),
             )
-            flash("Account created! Your free trial is ready, log in to start. "
-                  "It includes 2 emails, 3 CV uploads, or 7 days, whichever comes first.",
+            flash("Account created! Log in to start — AutoApply BW is free to use.",
                   "success")
             return redirect(url_for("auth.login"))
     return render_template("register.html")

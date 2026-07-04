@@ -47,7 +47,7 @@ r = client.post("/register", data={
     "_csrf": tok, "email": "user@test.local", "password": "password123",
     "full_name": "Test User", "phone": "+267 71 000 000",
 }, follow_redirects=True)
-check("register succeeds", r.status_code == 200 and b"free trial" in r.data)
+check("register succeeds", r.status_code == 200 and b"Account created" in r.data)
 
 # --- bad email rejected
 tok = get_csrf("/register")
@@ -65,18 +65,15 @@ tok = get_csrf("/login")
 r = client.post("/login", data={"_csrf": tok, "email": "user@test.local", "password": "password123"},
                 follow_redirects=True)
 check("login works", b"Welcome, Test User" in r.data)
-check("pending banner shows pay-by-card CTA", b"/billing" in r.data and b"Pay by card" in r.data)
+check("no payment/subscription UI", b"/billing" not in r.data and b"Subscription" not in r.data)
 
-# --- billing page renders; webhook rejects an unsigned call
-r = client.get("/billing/", follow_redirects=True)
-check("billing page renders", b"Subscription" in r.data)
+# --- billing routes are gone (free for everyone)
+check("billing page removed", client.get("/billing/", follow_redirects=True).status_code == 404)
 
 # --- Jobs page renders and offers search
 r = client.get("/jobs")
 check("jobs page renders", r.status_code == 200 and b"Available jobs" in r.data and b"Currently available" in r.data)
 check("jobs page lists apply-directly employers", b"Apply directly" in r.data and b"Access Bank Botswana" in r.data)
-r = client.post("/billing/webhook", json={"data": {"tx_ref": "x", "id": 1}})
-check("webhook rejects missing/forged signature", r.status_code == 401)
 
 # --- open redirect blocked
 client.post("/logout", data={"_csrf": get_csrf("/dashboard") or get_csrf("/login")})
@@ -86,10 +83,10 @@ r = client.post("/login?next=https://evil.example.com",
 check("open redirect blocked", "evil.example.com" not in r.headers.get("Location", ""),
       r.headers.get("Location", ""))
 
-# --- new user is on a free trial and CAN use key features (not blocked)
+# --- every logged-in user has full (free) access to key features
 r = client.post("/jobs/add", data={"_csrf": get_csrf("/dashboard"), "company_email": "hr@x.co.bw"},
                 follow_redirects=True)
-check("trial user can use features", b"Added application" in r.data)
+check("free user can use features", b"Added application" in r.data)
 
 # --- settings: bad port doesn't crash; password change works
 r = client.post("/settings", data={"_csrf": get_csrf("/settings"), "full_name": "Test User",
@@ -108,8 +105,6 @@ tok = get_csrf("/login")
 client.post("/login", data={"_csrf": tok, "email": "admin@test.local", "password": "admin-password-123"})
 r = client.get("/admin/")
 check("admin panel renders", r.status_code == 200 and b"user@test.local" in r.data)
-r = client.get("/admin/payments")
-check("admin payments page renders", r.status_code == 200 and b"Payments" in r.data)
 tok = get_csrf("/admin/")
 r = client.post("/admin/users/2/activate", data={"_csrf": tok, "access_expires": "bad-date"},
                 follow_redirects=True)
