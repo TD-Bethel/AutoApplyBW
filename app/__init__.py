@@ -88,6 +88,12 @@ def create_app():
             "default-src 'self'; style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; script-src 'self'; frame-ancestors 'none'",
         )
+        # HSTS only when we're actually on HTTPS (COOKIE_SECURE) — never send it on
+        # plain-http dev, where it would wrongly pin the browser to https.
+        if app.config["SESSION_COOKIE_SECURE"]:
+            resp.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
         return resp
 
     # Blueprints

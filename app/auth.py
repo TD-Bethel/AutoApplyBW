@@ -19,6 +19,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .db import query, execute, now_iso
 from .security import (
     valid_email, safe_next, too_many_attempts, record_failed_attempt, clear_attempts,
+    rate_limited,
 )
 from .services.emailer import send_system_email, EmailError
 
@@ -126,6 +127,10 @@ def register():
     if g.user:
         return redirect(url_for("main.dashboard"))
     if request.method == "POST":
+        if rate_limited("register", 10):
+            flash("Too many sign-up attempts from your network. Please wait a few "
+                  "minutes and try again.", "danger")
+            return render_template("register.html")
         email = request.form.get("email", "").strip().lower()[:MAX_EMAIL]
         password = request.form.get("password", "")[:MAX_PASSWORD]
         full_name = request.form.get("full_name", "").strip()[:MAX_NAME]
@@ -217,6 +222,11 @@ def forgot_password():
     if g.user:
         return redirect(url_for("main.dashboard"))
     if request.method == "POST":
+        # Throttle so this can't be abused to spam reset emails / burn SMTP quota.
+        if rate_limited("forgot", 5):
+            flash("Too many reset requests. Please wait a few minutes and try again.",
+                  "warning")
+            return redirect(url_for("auth.login"))
         email = request.form.get("email", "").strip().lower()[:MAX_EMAIL]
         user = query("SELECT * FROM users WHERE email = ?", (email,), one=True)
         if user:

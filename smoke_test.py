@@ -34,6 +34,8 @@ def get_csrf(path):
 # --- public pages render
 check("landing page renders", client.get("/").status_code == 200)
 check("login page renders", client.get("/login").status_code == 200)
+_h = client.get("/healthz")
+check("health check verifies DB (200 ok)", _h.status_code == 200 and b"ok" in _h.data)
 check("register page renders", client.get("/register").status_code == 200)
 
 # --- CSRF: POST without token is rejected

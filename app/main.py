@@ -31,6 +31,19 @@ def index():
     return render_template("index.html")
 
 
+@bp.route("/healthz")
+def healthz():
+    """Load-balancer health check that actually verifies the DB — so an instance
+    whose database is unreachable is pulled OUT of rotation instead of serving
+    500s. Returns 503 on failure so the platform stops routing traffic to it."""
+    try:
+        query("SELECT 1", one=True)
+    except Exception:  # noqa: BLE001 — any DB error means this instance is unhealthy
+        current_app.logger.exception("Health check failed: database unreachable")
+        return {"status": "error", "db": "unreachable"}, 503
+    return {"status": "ok"}, 200
+
+
 def _dashboard_context(**extra):
     """Shared template context for every route that renders dashboard.html —
     one place to keep them in sync."""

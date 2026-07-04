@@ -86,6 +86,27 @@ def clear_attempts(email):
         _attempts.pop(_client_key(email), None)
 
 
+def rate_limited(bucket, limit, window=WINDOW_SECONDS):
+    """Generic per-client-IP sliding-window limit for non-login endpoints
+    (e.g. registration, password-reset requests). Records the hit and returns
+    True once the client exceeds `limit` hits in `window` seconds.
+
+    Note: in-memory, so per-instance when scaled out — an attacker's hits spread
+    across instances. Good enough to blunt bots/email-bombing; move to a shared
+    store (Postgres/Redis) if you need a hard global cap."""
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
+    key = f"{bucket}|{ip}"
+    now = time.monotonic()
+    with _attempts_lock:
+        hits = _attempts[key]
+        while hits and now - hits[0] > window:
+            hits.popleft()
+        if len(hits) >= limit:
+            return True
+        hits.append(now)
+        return False
+
+
 # ------------------------------------------------------------------ redirects
 def safe_next(target):
     """Only allow same-site relative redirect targets (blocks open redirects)."""
