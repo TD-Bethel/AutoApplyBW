@@ -40,7 +40,7 @@ CACHE_TTL = 600            # cache each source's results for 10 min (be polite)
 
 # --------------------------------------------------------------------------- model
 COUNTRIES = {"BW": "Botswana", "NA": "Namibia", "ZM": "Zambia", "ZA": "South Africa",
-             "ZW": "Zimbabwe"}
+             "ZW": "Zimbabwe", "REMOTE": "Remote (worldwide)"}
 
 
 def _listing(title, company="", email="", description="", url="", location="",
@@ -141,12 +141,12 @@ def _can_fetch(url):
         return False
 
 
-def _http_get(url):
+def _http_get(url, max_bytes=MAX_BYTES):
     if not _can_fetch(url):
         raise PermissionError(f"robots.txt disallows {url}")
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:  # noqa: S310
-        return resp.read(MAX_BYTES)
+        return resp.read(max_bytes)
 
 
 def _http_text(url):
@@ -176,14 +176,20 @@ def _fetch_rss(cfg):
         link = _child_text(item, "link") or _atom_link(item)
         if not title:
             continue
+        company = cfg.get("company", "")
+        # Some boards (e.g. WeWorkRemotely) encode "Company: Role" in the title.
+        if cfg.get("company_in_title") and ": " in title:
+            company, title = title.split(": ", 1)
         listings.append(_listing(
             title=title,
-            company=cfg.get("company", ""),
+            company=company,
             email=_find_email(desc),
             description=desc,
             url=link,
+            location=_child_text(item, "region"),
             source=cfg["name"],
             posted=_child_text(item, "pubDate") or _child_text(item, "updated"),
+            country=cfg.get("country", "BW"),
         ))
     return listings
 
@@ -415,6 +421,61 @@ def _scan_listing(cfg, title, url):
     )
 
 
+# --------------------------------------------------------------------------- remote JSON boards
+# Remote-work boards (worldwide, apply online — no application email) expose
+# clean JSON APIs. One generic adapter; each board is a config dict saying
+# where the job list and fields live:
+#   {"name", "url", "list_key"? (omit when the response IS the list),
+#    "fields": {listing-field: json-key}, "max_bytes"?, "country"?}
+# Ported from the GigPilot project (github.com/TD-Bethel/GigPilot).
+def _fetch_json(cfg):
+    try:
+        data = json.loads(_http_get(cfg["url"], cfg.get("max_bytes", MAX_BYTES)))
+    except Exception:
+        return []
+    items = data.get(cfg["list_key"], []) if cfg.get("list_key") else data
+    f = cfg["fields"]
+    listings = []
+    for j in items:
+        if not isinstance(j, dict) or not j.get(f["title"]):
+            continue  # skips e.g. RemoteOK's leading legal-notice element
+        location = j.get(f.get("location", ""), "") or "Remote"
+        if isinstance(location, list):
+            location = ", ".join(location)
+        listings.append(_listing(
+            title=j.get(f["title"], ""),
+            company=j.get(f.get("company", ""), ""),
+            description=j.get(f.get("description", ""), "") or "",
+            url=j.get(f.get("url", ""), ""),
+            location=location,
+            source=cfg["name"],
+            posted=str(j.get(f.get("posted", ""), ""))[:10],
+            country=cfg.get("country", "REMOTE"),
+        ))
+        if len(listings) >= MAX_PER_SOURCE:
+            break
+    return listings
+
+
+# NOTE: Remotive and Jobicy also have clean public JSON APIs, but both sites'
+# robots.txt disallow their /api paths — so under the honour-robots.txt rule
+# they are out (see the source survey in README.md). Revisit only if the
+# politeness policy ever distinguishes documented APIs from crawling.
+_JSON_SOURCES = [
+    {"name": "remoteok", "country": "REMOTE",
+     "url": "https://remoteok.com/api",
+     "max_bytes": 8_000_000,  # one JSON body carrying every live post
+     "fields": {"title": "position", "company": "company", "url": "url",
+                "posted": "date", "description": "description",
+                "location": "location"}},
+    {"name": "workingnomads", "country": "REMOTE",
+     "url": "https://www.workingnomads.com/api/exposed_jobs/",
+     "fields": {"title": "title", "company": "company_name", "url": "url",
+                "posted": "pub_date", "description": "description",
+                "location": "location"}},
+]
+
+
 # Job-title words used to tell vacancy adverts apart from other documents/links.
 _JOB_WORDS = (r"vacanc|specialist|analyst|officer|manager|coordinator|assistant|"
               r"executive|engineer|accountant|technician|supervisor|clerk|graduate|"
@@ -480,6 +541,9 @@ _SCAN_SOURCES = [
 # {"name": ..., "feed": ...} to _RSS_SOURCES — no code changes needed.
 _RSS_SOURCES = [
     # e.g. {"name": "Jobs Botswana", "feed": "https://www.example.co.bw/jobs/feed/"},
+    {"name": "weworkremotely", "country": "REMOTE",
+     "feed": "https://weworkremotely.com/remote-jobs.rss",
+     "company_in_title": True},  # titles arrive as "Company: Role"
 ]
 
 # Employers whose openings we can't scrape — JavaScript-rendered career portals
@@ -565,6 +629,8 @@ for _cfg in _SCAN_SOURCES:
     SOURCES[_cfg["name"]] = {**_cfg, "fetch": _fetch_scan}
 for _cfg in _RSS_SOURCES:
     SOURCES[_cfg["name"]] = {**_cfg, "fetch": _fetch_rss}
+for _cfg in _JSON_SOURCES:
+    SOURCES[_cfg["name"]] = {**_cfg, "fetch": _fetch_json}
 
 # The sample source is for demos/tests; exclude it from live searches by default.
 DEFAULT_SOURCES = [n for n in SOURCES if n != "sample"]

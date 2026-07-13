@@ -203,6 +203,19 @@ Other employers checked, for future adapters:
   queries (and their terms prohibit it), so source discovery stays manual —
   but each find is a one-line config entry.
 
+### Remote-board survey (July 2026)
+
+Worldwide remote-work boards added as the "Remote (worldwide)" category
+(ported from the GigPilot project — github.com/TD-Bethel/GigPilot):
+
+- **Working**: RemoteOK (JSON API, `_JSON_SOURCES`), WorkingNomads (JSON API),
+  WeWorkRemotely (RSS, `_RSS_SOURCES` with `company_in_title`).
+- **Public API but robots.txt disallows `/api`**: Remotive, Jobicy. Their API
+  docs invite programmatic use, but under the honour-robots.txt rule they're
+  excluded until the policy distinguishes documented APIs from crawling.
+- Remote listings have **no application email** — applications go through the
+  board's own page, so these appear with an "open the advert" link only.
+
 ---
 
 ## Roadmap
