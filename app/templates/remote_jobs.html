@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Remote Jobs, AutoApply BW{% endblock %}
+{% block content %}
+<h1>Remote jobs</h1>
+<p class="muted">Work-from-anywhere roles you can do from Botswana, pulled live from
+  five free worldwide boards — Remotive, RemoteOK, We Work Remotely, Working Nomads
+  and Jobicy. Applications happen on the board's site: open a role and apply there.</p>
+
+{# ---------------- Search ---------------- #}
+<div class="card">
+  <h2>Search remote jobs</h2>
+  <form method="get" action="{{ url_for('main.remote_jobs') }}">
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:1"><label for="keywords">Keywords</label>
+        <input id="keywords" name="keywords" value="{{ find_keywords or '' }}"
+               placeholder="e.g. python, data entry, customer support, design"></div>
+      <div><button class="btn" type="submit">Search</button>
+        {% if find_keywords %}<a class="btn secondary" href="{{ url_for('main.remote_jobs') }}">Clear</a>{% endif %}
+      </div>
+    </div>
+  </form>
+</div>
+
+{# ---------------- Listings ---------------- #}
+<div class="card">
+  {% if found is not none %}
+    <h2>Search results</h2>
+    {% if found %}<p class="muted">{{ found|length }} result(s) for
+      <strong>{{ find_keywords }}</strong>.</p>{% endif %}
+    {% set jobs = found %}
+  {% else %}
+    <h2>Fresh remote openings</h2>
+    {% set jobs = listings %}
+  {% endif %}
+
+  {% if jobs %}
+    {% for j in jobs %}
+    <div class="found-job">
+      <strong>{% if j.url %}<a href="{{ j.url }}" target="_blank" rel="noopener noreferrer">{{ j.job_title }}</a>{% else %}{{ j.job_title }}{% endif %}</strong>
+      {% if j.company_name %}<span class="muted">, {{ j.company_name }}</span>{% endif %}
+      {% if j.location %}<span class="badge">{{ j.location }}</span>{% endif %}
+      <span class="badge">{{ j.source }}</span>
+      {% if j.posted %}<span class="muted" style="font-size:0.8rem"> {{ j.posted[:10] }}</span>{% endif %}
+      {% if j.job_description %}
+      <p class="muted tight">{{ j.job_description[:220] }}{% if j.job_description|length > 220 %}…{% endif %}</p>
+      {% endif %}
+      {% if j.url %}
+      <div class="row" style="align-items:center">
+        <a class="btn small secondary" href="{{ j.url }}" target="_blank" rel="noopener noreferrer">View &amp; apply &rarr;</a>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% elif found is none %}
+    <p class="muted">Fetching the latest remote openings in the background — refresh
+      this page in a moment.</p>
+  {% else %}
+    <p class="muted">No results. Try fewer or different keywords.</p>
+  {% endif %}
+</div>
+
+<p class="muted" style="font-size:0.85rem">Tip: tailor your CV on the
+  <a href="{{ url_for('main.dashboard') }}">dashboard</a> before applying — most of
+  these boards ask for a CV or portfolio link.</p>
+{% endblock %}

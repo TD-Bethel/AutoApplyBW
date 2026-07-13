@@ -76,6 +76,8 @@ check("billing page removed", client.get("/billing/", follow_redirects=True).sta
 r = client.get("/jobs")
 check("jobs page renders", r.status_code == 200 and b"Available jobs" in r.data and b"Currently available" in r.data)
 check("jobs page lists apply-directly employers", b"Apply directly" in r.data and b"Access Bank Botswana" in r.data)
+r = client.get("/jobs/remote")
+check("remote jobs page renders", r.status_code == 200 and b"Remote jobs" in r.data)
 
 # --- open redirect blocked
 client.post("/logout", data={"_csrf": get_csrf("/dashboard") or get_csrf("/login")})

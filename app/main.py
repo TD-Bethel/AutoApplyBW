@@ -103,6 +103,32 @@ def jobs():
     )
 
 
+@bp.route("/jobs/remote")
+@login_required
+def remote_jobs():
+    """Work-from-anywhere roles from the free worldwide boards (sources shared
+    with the GigPilot project). Browsing reads the cache (never blocks); a
+    keyword search queries the remote sources only."""
+    scraper.warm_async()  # fill the vacancy cache in the background
+    keywords = request.args.get("keywords", "").strip()[:MAX_FIELD]
+    found = None  # None = browsing; [] = searched, nothing matched
+    if keywords:
+        try:
+            found = scraper.search(keywords=keywords, country="REMOTE")
+        except Exception:  # noqa: BLE001 — search must never 500 the page
+            current_app.logger.exception("Remote job search failed")
+            found = []
+            flash("Job search is unavailable right now. Please try again later.", "warning")
+        if not found:
+            flash("No matching remote jobs found. Try fewer or different keywords.", "info")
+    return render_template(
+        "remote_jobs.html",
+        listings=scraper.overview(per_country=24).get("REMOTE", []),
+        found=found,
+        find_keywords=keywords,
+    )
+
+
 # ------------------------------------------------------------------ CV upload + review
 @bp.route("/cv/upload", methods=["POST"])
 @active_required

@@ -23,6 +23,7 @@
       {% if g.user %}
         <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
         <a href="{{ url_for('main.jobs') }}">Jobs</a>
+        <a href="{{ url_for('main.remote_jobs') }}">Remote Jobs</a>
         <a href="{{ url_for('assistants.index') }}">Career Team</a>
         <a href="{{ url_for('main.settings') }}">Settings</a>
         {% if g.user['role'] == 'admin' %}<a href="{{ url_for('admin.index') }}">Admin</a>{% endif %}
