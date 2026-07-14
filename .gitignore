@@ -29,3 +29,6 @@ Thumbs.db
 
 # Sibling project (its own separate repo)
 eFileTrace/
+
+# Sibling project folders that live inside this directory but are separate repos
+pc-home-security/
