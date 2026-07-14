@@ -141,8 +141,11 @@ def _can_fetch(url):
         return False
 
 
-def _http_get(url, max_bytes=MAX_BYTES):
-    if not _can_fetch(url):
+def _http_get(url, max_bytes=MAX_BYTES, robots_exempt=False):
+    # robots_exempt is ONLY for documented public APIs whose own docs invite
+    # programmatic use (robots.txt there targets search crawlers, not API
+    # clients). HTML scraping always honours robots.txt.
+    if not robots_exempt and not _can_fetch(url):
         raise PermissionError(f"robots.txt disallows {url}")
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:  # noqa: S310
@@ -430,7 +433,8 @@ def _scan_listing(cfg, title, url):
 # Ported from the GigPilot project (github.com/TD-Bethel/GigPilot).
 def _fetch_json(cfg):
     try:
-        data = json.loads(_http_get(cfg["url"], cfg.get("max_bytes", MAX_BYTES)))
+        data = json.loads(_http_get(cfg["url"], cfg.get("max_bytes", MAX_BYTES),
+                                    robots_exempt=cfg.get("robots_exempt", False)))
     except Exception:
         return []
     items = data.get(cfg["list_key"], []) if cfg.get("list_key") else data
@@ -457,11 +461,25 @@ def _fetch_json(cfg):
     return listings
 
 
-# NOTE: Remotive and Jobicy also have clean public JSON APIs, but both sites'
-# robots.txt disallow their /api paths — so under the honour-robots.txt rule
-# they are out (see the source survey in README.md). Revisit only if the
-# politeness policy ever distinguishes documented APIs from crawling.
+# Remotive and Jobicy carry robots_exempt: their robots.txt disallow /api,
+# but both publish API docs inviting programmatic use — the robots rule there
+# targets search crawlers. The exemption applies to documented APIs only;
+# HTML scraping always honours robots.txt (see the README source survey).
 _JSON_SOURCES = [
+    {"name": "remotive", "country": "REMOTE", "robots_exempt": True,
+     # API docs: github.com/remotive-com/remote-jobs-api
+     "url": "https://remotive.com/api/remote-jobs?limit=50",
+     "list_key": "jobs",
+     "fields": {"title": "title", "company": "company_name", "url": "url",
+                "posted": "publication_date", "description": "description",
+                "location": "candidate_required_location"}},
+    {"name": "jobicy", "country": "REMOTE", "robots_exempt": True,
+     # API docs: jobicy.com/api (public feed, no key)
+     "url": "https://jobicy.com/api/v2/remote-jobs?count=50",
+     "list_key": "jobs",
+     "fields": {"title": "jobTitle", "company": "companyName", "url": "url",
+                "posted": "pubDate", "description": "jobExcerpt",
+                "location": "jobGeo"}},
     {"name": "remoteok", "country": "REMOTE",
      "url": "https://remoteok.com/api",
      "max_bytes": 8_000_000,  # one JSON body carrying every live post
@@ -473,6 +491,83 @@ _JSON_SOURCES = [
      "fields": {"title": "title", "company": "company_name", "url": "url",
                 "posted": "pub_date", "description": "description",
                 "location": "location"}},
+]
+
+
+# --------------------------------------------------------------------------- ATS boards
+# Public, key-less JSON APIs of hosted applicant-tracking systems (Greenhouse,
+# Lever). Idea borrowed from the career-ops project (github.com/santifer/
+# career-ops, MIT): many employers' vacancies live behind a handful of ATS
+# providers, so ONE adapter per provider unlocks any company hosted on it —
+# each company is just a config dict with its board slug and country.
+def _fetch_greenhouse(cfg):
+    url = f"https://boards-api.greenhouse.io/v1/boards/{cfg['board']}/jobs"
+    try:
+        data = json.loads(_http_get(url))
+    except Exception:
+        return []
+    listings = []
+    for j in data.get("jobs", [])[:MAX_PER_SOURCE]:
+        loc = (j.get("location") or {}).get("name") or cfg.get("location", "Remote")
+        listings.append(_listing(
+            title=j.get("title", ""),
+            company=cfg["company"],
+            description=(f"Location: {loc}. Open the advert for full requirements "
+                         f"(applications go through the company's careers portal)."),
+            url=j.get("absolute_url", ""),
+            location=loc,
+            source=cfg["name"],
+            posted=str(j.get("updated_at", ""))[:10],
+            country=cfg.get("country", "REMOTE"),
+        ))
+    return listings
+
+
+def _fetch_lever(cfg):
+    url = f"https://api.lever.co/v0/postings/{cfg['board']}?mode=json"
+    try:
+        data = json.loads(_http_get(url))
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    listings = []
+    for j in data[:MAX_PER_SOURCE]:
+        loc = (j.get("categories") or {}).get("location") or cfg.get("location", "Remote")
+        try:  # Lever's createdAt is a millisecond epoch
+            posted = time.strftime("%Y-%m-%d", time.gmtime(j.get("createdAt", 0) / 1000))
+        except (TypeError, ValueError, OSError):
+            posted = ""
+        listings.append(_listing(
+            title=j.get("text", ""),
+            company=cfg["company"],
+            description=j.get("descriptionPlain", "") or f"Location: {loc}.",
+            url=j.get("hostedUrl", ""),
+            location=loc,
+            source=cfg["name"],
+            posted=posted,
+            country=cfg.get("country", "REMOTE"),
+        ))
+    return listings
+
+
+_ATS_FETCHERS = {"greenhouse": _fetch_greenhouse, "lever": _fetch_lever}
+
+# Each entry: {"name", "ats": "greenhouse"|"lever", "board": <slug>, "company",
+# "country"}. A wrong/retired slug is harmless — the adapter returns [] on any
+# failure — but keep this list to boards seen working, per the source survey.
+_ATS_SOURCES = [
+    # South Africa
+    {"name": "luno", "ats": "greenhouse", "board": "luno", "company": "Luno",
+     "country": "ZA", "location": "South Africa"},
+    # Worldwide remote employers that hire from anywhere (verified July 2026;
+    # andela/flutterwave/yoco/paystack slugs 404 now — see README survey)
+    {"name": "canonical", "ats": "greenhouse", "board": "canonical",
+     "company": "Canonical (Ubuntu)", "country": "REMOTE", "location": "Remote (worldwide)"},
+    {"name": "gitlab", "ats": "greenhouse", "board": "gitlab", "company": "GitLab",
+     "country": "REMOTE", "location": "Remote (worldwide)"},
+    {"name": "remotecom", "ats": "greenhouse", "board": "remotecom",
+     "company": "Remote.com", "country": "REMOTE", "location": "Remote (worldwide)"},
 ]
 
 
@@ -631,6 +726,8 @@ for _cfg in _RSS_SOURCES:
     SOURCES[_cfg["name"]] = {**_cfg, "fetch": _fetch_rss}
 for _cfg in _JSON_SOURCES:
     SOURCES[_cfg["name"]] = {**_cfg, "fetch": _fetch_json}
+for _cfg in _ATS_SOURCES:
+    SOURCES[_cfg["name"]] = {**_cfg, "fetch": _ATS_FETCHERS[_cfg["ats"]]}
 
 # The sample source is for demos/tests; exclude it from live searches by default.
 DEFAULT_SOURCES = [n for n in SOURCES if n != "sample"]

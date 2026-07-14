@@ -26,8 +26,12 @@
 - **Human-in-the-loop sending**: scraped/found jobs are drafts; a person confirms
   the application email and clicks send. Never auto-send.
 - **Scraping politeness**: honour robots.txt, real User-Agent, timeouts, response
-  caps, per-source caching (see app/services/scraper.py). New job sources are
-  config entries (_SF_SOURCES / _SCAN_SOURCES / _RSS_SOURCES), not new code paths.
+  caps, per-source caching (see app/services/scraper.py). One narrow exception:
+  a source config may set `robots_exempt: True` for a *documented public API*
+  whose docs invite programmatic use (robots.txt there targets search crawlers);
+  cite the API docs in a comment. HTML scraping is never exempt. New job sources
+  are config entries (_SF_SOURCES / _SCAN_SOURCES / _RSS_SOURCES / _JSON_SOURCES
+  / _ATS_SOURCES), not new code paths.
 - **Security invariants**: every state-changing form carries the CSRF token
   (`_csrf` + csrf_token()); user-owned rows are checked via _owned_app();
   SMTP values are CR/LF-stripped; secrets live in .env (never commit it).

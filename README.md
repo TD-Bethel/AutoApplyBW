@@ -209,10 +209,15 @@ Worldwide remote-work boards added as the "Remote (worldwide)" category
 (ported from the GigPilot project — github.com/TD-Bethel/GigPilot):
 
 - **Working**: RemoteOK (JSON API, `_JSON_SOURCES`), WorkingNomads (JSON API),
-  WeWorkRemotely (RSS, `_RSS_SOURCES` with `company_in_title`).
-- **Public API but robots.txt disallows `/api`**: Remotive, Jobicy. Their API
-  docs invite programmatic use, but under the honour-robots.txt rule they're
-  excluded until the policy distinguishes documented APIs from crawling.
+  WeWorkRemotely (RSS, `_RSS_SOURCES` with `company_in_title`), Remotive and
+  Jobicy (JSON APIs, `robots_exempt` — their robots.txt disallow `/api`, but
+  both publish API docs inviting programmatic use, so the exemption for
+  documented public APIs applies; policy in CLAUDE.md).
+- **ATS boards** (`_ATS_SOURCES`, one generic adapter per provider): Greenhouse
+  boards verified working for Luno (ZA), Canonical, GitLab, Remote.com.
+  Retired/moved slugs as of July 2026 (API returns 404): Andela, Flutterwave,
+  Yoco (Greenhouse), Paystack (Lever) — these employers likely changed ATS;
+  re-survey before re-adding.
 - Remote listings have **no application email** — applications go through the
   board's own page, so these appear with an "open the advert" link only.
 
