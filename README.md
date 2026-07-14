@@ -1,231 +1,170 @@
-# AutoApply BW
+<div align="center">
 
-An automated job-application assistant for Batswana / youth in Botswana.
+# 🇧🇼 AutoApply BW
 
-Users can:
+**The free job-application assistant for Botswana's youth.**
 
-- **Upload and check their CV** — get a score and concrete, actionable suggestions.
-- **Tailor their CV and cover letter to each job** — keyword-matched to the advert
-  (AI-powered with Claude when an API key is set, with a free rule-based fallback).
-- **Apply to many companies** — personalised emails sent from the user's own inbox,
-  rate-limited to protect against spam blacklisting.
+Find real openings across Southern Africa and worldwide-remote boards, get your
+CV scored and tailored to each advert by AI, and send personalised applications
+from your own inbox — with a human confirming every send.
 
-Access is **owner-controlled**: users register, pay offline (Orange Money / MyZaka /
-bank transfer), and the owner activates their account from an admin panel.
-
----
-
-## Tech stack
-
-Pure-Python and dependency-light so it installs and runs on any modern Python
-(including 3.14) without compiling native wheels:
-
-- **Flask** — web framework (server-rendered Jinja2 templates)
-- **sqlite3** (stdlib) — database, no ORM
-- **requests** — calls the Claude API directly (no heavy SDK)
-- **pypdf** — read text from PDF CVs (DOCX is parsed with the stdlib)
-- **waitress** — production WSGI server
-
----
-
-## Deploy (always-on, free)
+![Python](https://img.shields.io/badge/Python-3.10%E2%80%933.14-3776AB?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.x-000000?logo=flask&logoColor=white)
+![Database](https://img.shields.io/badge/DB-SQLite%20%7C%20PostgreSQL-336791?logo=postgresql&logoColor=white)
+![Dependencies](https://img.shields.io/badge/dependencies-pure%20Python-brightgreen)
+![Access](https://img.shields.io/badge/access-free%20for%20everyone-blue)
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/TD-Bethel/AutoApplyBW)
 
-One click reads the committed `render.yaml`; set `ADMIN_EMAIL` / `ADMIN_PASSWORD`
-when prompted and you get a permanent `https://…onrender.com` URL. AI features run
-on the free rule-based fallback unless you add `ANTHROPIC_API_KEY` in the dashboard.
-(Free tier sleeps when idle and uses ephemeral storage — see `render.yaml` for
-persistence. Fly.io remains an option via `fly.toml`.)
+</div>
 
 ---
 
-## Quick start
+## ✨ What's inside
+
+| Page | What you get |
+|---|---|
+| **Dashboard** | Upload a CV → instant score + concrete fixes; add jobs; tailor; send — the whole pipeline on one page |
+| **Jobs** | Live vacancies scraped per country (🇧🇼 🇳🇦 🇿🇲 🇿🇦 🇿🇼) + an *apply-directly* directory of employers we link to instead of scraping |
+| **Remote Jobs** | Work-from-anywhere roles from five free worldwide boards + ATS boards (Greenhouse/Lever) |
+| **Career Team** | Three isolated AI assistants — CV coach, cover-letter writer, interview prep — each with its own memory |
+| **Support chat** | Users reach the owner in-app; scripted auto-replies handle the common questions |
+| **Admin** | Owner panel: user list, CV viewer, support inbox, suspend/activate as a moderation backstop |
+
+**Free for everyone** — no payments, no trial. Anyone who registers gets the
+full app. (A complete card-payment/subscription build is preserved on the
+`add-card-payments` branch if it's ever wanted.)
+
+## 🧠 The AI is offline-first
+
+Every AI feature works **without any API key** — a rule-based engine scores,
+tailors and drafts using keyword matching and templates. Set
+`ANTHROPIC_API_KEY` (or any OpenAI-compatible endpoint via `DEEPSEEK_API_URL`)
+and the same features are AI-powered instead — the output shape is identical,
+so nothing else changes. The owner provides **one** key for all users.
+
+## 🌍 Where the jobs come from
+
+- **Botswana** — Mascom, BTC, BPC, Chobe Holdings, Botswana Stock Exchange
+- **Namibia** — Telecom Namibia, NamPost
+- **South Africa** — Capitec, Discovery, Nedbank, Luno
+- **Zimbabwe** — Delta Corporation
+- **Remote (worldwide)** — Remotive, RemoteOK, WeWorkRemotely, WorkingNomads,
+  Jobicy, plus Greenhouse ATS boards (Canonical, GitLab, Remote.com)
+
+The scraper is stdlib-only, robots-respecting, cached, parallel, and
+failure-tolerant; **new sources are one-line config entries**, not code. Full
+details + the SADC employer survey: [docs/job-sources.md](docs/job-sources.md).
+
+## 🚀 Quick start
 
 ```bash
-# 1. Create and activate a virtual environment
+git clone https://github.com/TD-Bethel/AutoApplyBW.git && cd AutoApplyBW
 python -m venv .venv
-.venv\Scripts\activate          # Windows PowerShell:  .venv\Scripts\Activate.ps1
-# source .venv/bin/activate     # macOS / Linux
-
-# 2. Install dependencies
+.venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-
-# 3. Configure
-copy .env.example .env          # cp .env.example .env  on macOS/Linux
-#   then edit .env and set SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD,
-#   and (optionally) ANTHROPIC_API_KEY
-
-# 4. Run
-python run.py                   # dev server at http://127.0.0.1:8000
-python run.py --serve           # production server (waitress)
+copy .env.example .env            # macOS/Linux: cp .env.example .env
+#   edit .env: set SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD
+python run.py                     # dev server → http://127.0.0.1:8000
+python run.py --serve             # production server (waitress)
 ```
 
-On first run an **admin account** is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD`
-in your `.env`. Log in with it to reach the **Admin** panel and activate users.
+First run creates the **admin account** from `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 
----
+## ☁️ Deploy — built to scale
 
-## How it works
+The **Deploy to Render** button above reads [`render.yaml`](render.yaml), which
+provisions the launch architecture:
 
-### Access control (the paywall)
-1. A user signs up → account is `pending`.
-2. They pay you offline and message you.
-3. You open **Admin**, set them to **Active** (optionally with an expiry date for a
-   subscription). Only active, non-expired users can tailor and send applications.
+```
+users ──► Render load balancer ──► 2× stateless app instances ──► managed PostgreSQL
+                                       │  /healthz (checks the DB, pulls a dead
+                                       │   instance out of rotation)
+                                       └─ HSTS · secure cookies · Sentry · JSON logs
+```
 
-### CV tailoring
-- With `ANTHROPIC_API_KEY` set, Claude reviews the CV and rewrites the CV + cover
-  letter to match each job description — **without inventing facts**.
-- Without a key, a free rule-based engine matches job keywords and fills a
-  professional cover-letter template.
-- You (the owner) provide **one** API key for everyone, so users never need their own.
+- **SQLite by default, PostgreSQL when `DATABASE_URL` is set** — same code,
+  auto-detected ([app/db.py](app/db.py), pure-Python `pg8000` driver). Postgres
+  is what allows multiple instances; add more with `numInstances`.
+- Sessions are signed cookies (stateless) — no sticky sessions needed; just keep
+  `SECRET_KEY` fixed and shared.
+- Optional [Sentry](https://sentry.io) error tracking (`SENTRY_DSN`) and
+  structured JSON request logs (`LOG_JSON=1`).
+- Fly.io works too: [`fly.toml`](fly.toml) + [`Dockerfile`](Dockerfile).
 
-### Email sending
-- Each user configures **their own** email (SMTP) in **Settings** — applications are
-  sent from their inbox, which is far better for deliverability than blasting from one
-  shared account.
-- Sending is **rate-limited per hour** (`SEND_RATE_PER_HOUR`) to avoid spam blocks.
-- For Gmail/Outlook users must use an **app password**, not their normal password.
+## ⚙️ Configuration
 
----
+All via `.env` (see [.env.example](.env.example) for the full annotated list):
 
-## Project layout
+| Variable | Purpose |
+|---|---|
+| `SECRET_KEY` | Session signing — **required in production**, must be identical across instances |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | First-run owner account |
+| `DATABASE_URL` | Set to a `postgres://…` URL to switch to PostgreSQL (else SQLite at `DATABASE_PATH`) |
+| `COOKIE_SECURE=1` | Secure cookies + HSTS when serving HTTPS |
+| `ANTHROPIC_API_KEY` | Optional — AI-powered tailoring (blank = free rule-based engine) |
+| `SMTP_HOST/PORT/USER/PASSWORD` | Platform mailbox for password resets (users configure their own sending inbox in Settings) |
+| `SEND_RATE_PER_HOUR` | Per-user hourly send cap (anti-spam, default 30) |
+| `SENTRY_DSN`, `LOG_JSON` | Observability (both optional) |
+
+## 🧪 Tests
+
+| Command | What it covers |
+|---|---|
+| `python smoke_test.py` | Fast end-to-end suite — auth, CSRF, pages, admin, throttling (**must stay ALL PASS**) |
+| `python integration_test.py` | Fuller integration suite |
+| `python customer_journey.py` | Scripted walk-through of a real user's journey |
+
+## 🗂️ Project layout
 
 ```
 AutoApplyBW/
-├── run.py                  # entry point
-├── requirements.txt
-├── .env.example
-├── app/
-│   ├── __init__.py         # app factory, config, first-run admin
-│   ├── db.py               # sqlite3 data layer + schema
-│   ├── security.py         # CSRF, login throttling, safe redirects
-│   ├── auth.py             # register/login + access-control decorators
-│   ├── main.py             # dashboard, CV, applications, settings
-│   ├── admin.py            # owner panel: activate / suspend users
-│   ├── services/
-│   │   ├── cv_parser.py    # PDF / DOCX / TXT -> text
-│   │   ├── ai.py           # Claude review + tailoring (rule-based fallback)
-│   │   └── emailer.py      # SMTP sending
-│   ├── templates/          # Jinja2 pages
-│   └── static/style.css
-└── instance/               # database + data (git-ignored, never committed)
+├── run.py                     # entry point (dev / --serve)
+├── render.yaml  fly.toml  Dockerfile
+├── smoke_test.py  integration_test.py  customer_journey.py
+├── docs/
+│   ├── architecture.md        # how the parts connect (mermaid diagram)
+│   └── job-sources.md         # source adapters + SADC employer survey
+└── app/
+    ├── __init__.py            # app factory, config, security headers, first-run admin
+    ├── db.py                  # SQLite/PostgreSQL dual-backend data layer (no ORM)
+    ├── security.py            # CSRF, login throttling, rate limits, safe redirects
+    ├── observability.py       # structured request logs + optional Sentry
+    ├── auth.py                # register / login / access decorators
+    ├── main.py                # dashboard, CV, jobs, remote jobs, sending, settings
+    ├── admin.py               # owner panel
+    ├── assistants.py          # Career Team (AI assistants)
+    ├── support.py             # in-app support chat
+    ├── services/
+    │   ├── scraper.py         # job discovery (all source adapters)
+    │   ├── ai.py              # review + tailoring (API or offline rules)
+    │   ├── cv_parser.py       # PDF / DOCX / TXT → text
+    │   ├── pdf.py             # tailored CV → PDF (fpdf2)
+    │   └── emailer.py         # per-user SMTP sending
+    ├── templates/             # Jinja2 pages
+    └── static/                # styles, JS, images
 ```
 
----
+## 🔒 Security
 
-## Security & privacy notes
+- **CSRF tokens** on every state-changing form (per-session, no extra deps)
+- **Login throttled** (8 fails / 15 min / IP+email) with constant-time dummy-hash
+  checks; **register + password-reset requests rate-limited** against bots
+- Suspension kills **existing sessions immediately**
+- `HttpOnly` + `SameSite` cookies; `Secure` + **HSTS** under HTTPS
+- CSP, `X-Frame-Options`, `nosniff`, referrer-policy headers on every response
+- SMTP values **CR/LF-stripped** (no header injection); recipients validated
+- Password-reset tokens stored **hashed**, short-lived, single-use
+- User data lives in the DB (git-ignored locally); never commit your `.env`
 
-- All state-changing forms are **CSRF-protected** (per-session token, no extra deps).
-- Login is **rate-limited** (8 failed attempts per 15 minutes per IP+email) and uses a
-  constant-time dummy-hash check so attackers can't probe which emails exist.
-- Suspending a user kills their **existing session immediately**, not just new logins.
-- Session cookies are `HttpOnly` + `SameSite=Lax`; set `COOKIE_SECURE=1` in production
-  (HTTPS) so they are `Secure` too. Sessions expire after 14 days.
-- Responses carry security headers (CSP, `X-Frame-Options`, `nosniff`, referrer policy).
-- Email sending strips CR/LF from user-supplied values (no SMTP header injection) and
-  validates recipient addresses.
-- User data (the SQLite DB, including CVs) lives in `instance/` and is **git-ignored**.
-- Email app-passwords are stored in the database and are never echoed back into HTML.
-  For production, run on a host you control and consider encrypting these at rest.
-- Never commit your real `.env`.
+## 🙌 Credits
 
----
+- Remote-board adapters ported from [GigPilot](https://github.com/TD-Bethel/GigPilot)
+- The one-adapter-per-ATS idea from [career-ops](https://github.com/santifer/career-ops) (MIT)
+- Background photos: Diego Delso (CC BY-SA 4.0), Temptious (CC0), via Wikimedia Commons
 
-## Find jobs (built-in job search)
+## 🗺️ Roadmap
 
-The dashboard's **Find jobs** card searches live company vacancy pages across
-Southern Africa (with a country picker: Botswana, Namibia, Zambia, South Africa)
-and turns results into one-click application drafts.
-
-**Botswana**
-- **Mascom** — `mascom.bw/vacancy-listings/` (HTML vacancy table; expired adverts filtered out)
-- **BTC** — `btc.bw` job openings (WordPress JSON API, no HTML scraping)
-- **BPC** — `careers.bpc.bw` (SAP SuccessFactors)
-- **Chobe Holdings** — `chobeholdings.co.bw` (vacancy links, safari camps/lodges)
-- **Botswana Stock Exchange** — `bse.co.bw/vacancies/` (vacancy notice PDFs)
-
-**Namibia**
-- **Telecom Namibia** — `telecom.na/vacancies` (vacancy notice PDFs)
-- **NamPost** — `nampost.com.na/corporate/vacancies` (vacancy headings)
-
-**South Africa**
-- **Capitec Bank** — `careers.capitecbank.co.za` (SAP SuccessFactors)
-- **Discovery** — `careers.discovery.co.za` (SAP SuccessFactors)
-- **Nedbank** — `jobs.nedbank.co.za` (SAP SuccessFactors)
-
-**Zimbabwe**
-- **Delta Corporation** — `delta.co.zw/vacancies/` (vacancy notice PDFs)
-
-The scraper (`app/services/scraper.py`) is stdlib-only, honours `robots.txt`,
-caches each source for 10 minutes, fetches sources in parallel, interleaves
-sources fairly in unranked results, and never breaks the dashboard if a source
-is down. Results are reviewed by the user — the application email is confirmed
-by a human before anything is sent. New sources are **config-only**:
-SuccessFactors portals go in `_SF_SOURCES`, simple careers pages (vacancy
-links, PDFs, or headings) in `_SCAN_SOURCES`, RSS/Atom feeds in `_RSS_SOURCES`.
-To discover more sources manually, this search works well:
-`(site:.co.bw OR site:.com.na OR site:.co.zm OR site:.co.za) ("careers" OR "vacancies")`.
-
-### Source survey (June 2026)
-
-Other employers checked, for future adapters:
-
-- **Careers page exists, no openings right now** (recheck periodically; some may
-  work with `_SCAN_SOURCES` once their listing markup is visible): Bomaid, CEDA,
-  LEA, BOCRA, BoFiNet, Letshego, Air Botswana, Botswana Railways, Bank of
-  Botswana, BIHL, Minet, Debswana, First Capital, Choppies
-  (`jobs.choppies.co.bw`), Cresta Marakanelo, Bank Gaborone, Namdeb,
-  Debmarine, Namibia Wildlife Resorts, Sefalana.
-- **Behind an ATS / JS app that can't be scraped simply**: FNB (Workday),
-  Stanbic / Standard Chartered / Access Bank (group-level portals), Botswana
-  Life + NamWater + Woolworths + Isuzu (eRecruit/Trending Talent), Botswana Oil
-  + Pep (MCI Direct Hire), De Beers (global list, no per-job location), BHC +
-  WUC + ZESCO (JavaScript apps without a discoverable public API), Eskom
-  (custom portal), Sasol (SuccessFactors but renders jobs via JS), Shoprite +
-  Clicks + Spar + Ford + Truworths + Raubex + Aveng + Oceana (group portals/ATS
-  widgets), BMW + DSV + Investec + First Quantum (JS-rendered job lists).
-- **Site unreachable at survey time**: Orange BW, Khoemacau (broken SSL), BDC
-  (broken SSL), Engen, TotalEnergies BW, Turnstar, BotswanaPost, MTC Namibia,
-  Namib Mills, Zamtel, O&L Group, Zambia Sugar, CEC, NICO, Far Property,
-  RDC Properties, Courier Guy, Tiger Brands — plus, from the June 2026 SADC
-  sweep: most ZW/ZM/NA corporate sites (Namdeb, Rössing, NamPower, Namport,
-  Gondwana, TransNamib, ZCCM, KCM, Zanaco-careers, Econet, NetOne, OK Zimbabwe,
-  Meikles, Innscor, NRZ and others) refuse connections from non-browser
-  clients or are simply down.
-- **Careers info page but no machine-readable listings**: Zanaco, ZACL,
-  Zambeef, Mr Price, TFG, Sanlam, BITC, FSG, Minergy, Tlou Energy, NamPower
-  (recruitment portal has broken SSL).
-- **Facebook groups**: cannot be used — posts sit behind a login wall and
-  Facebook's terms prohibit automated collection.
-- **Automating the `site:` search formula**: search engines block automated
-  queries (and their terms prohibit it), so source discovery stays manual —
-  but each find is a one-line config entry.
-
-### Remote-board survey (July 2026)
-
-Worldwide remote-work boards added as the "Remote (worldwide)" category
-(ported from the GigPilot project — github.com/TD-Bethel/GigPilot):
-
-- **Working**: RemoteOK (JSON API, `_JSON_SOURCES`), WorkingNomads (JSON API),
-  WeWorkRemotely (RSS, `_RSS_SOURCES` with `company_in_title`), Remotive and
-  Jobicy (JSON APIs, `robots_exempt` — their robots.txt disallow `/api`, but
-  both publish API docs inviting programmatic use, so the exemption for
-  documented public APIs applies; policy in CLAUDE.md).
-- **ATS boards** (`_ATS_SOURCES`, one generic adapter per provider): Greenhouse
-  boards verified working for Luno (ZA), Canonical, GitLab, Remote.com.
-  Retired/moved slugs as of July 2026 (API returns 404): Andela, Flutterwave,
-  Yoco (Greenhouse), Paystack (Lever) — these employers likely changed ATS;
-  re-survey before re-adding.
-- Remote listings have **no application email** — applications go through the
-  board's own page, so these appear with an "open the advert" link only.
-
----
-
-## Roadmap
-
-- Automated online payments (DPO Pay / Flutterwave / mobile money) instead of manual activation
-- More job sources (Khoemacau and Orange BW careers pages were unreachable at build time; recheck)
-- PDF export of the tailored CV (instead of plain-text attachment)
 - Application tracking (replies, interview status)
+- Background worker for AI + email (keeps request threads free as traffic grows)
+- More job sources — see the [survey](docs/job-sources.md) for candidates

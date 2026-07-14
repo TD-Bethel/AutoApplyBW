@@ -60,8 +60,8 @@
   User-Agent, which some WAFs 403 (e.g. Chobe). scraper.py fetches robots.txt
   manually with its own UA — keep it that way.
 - **Job-source survey** (which SADC employers are scrapeable and why others
-  aren't): see "Source survey" in README.md before probing new sources.
+  aren't): see docs/job-sources.md before probing new sources.
 - First-run admin comes from ADMIN_EMAIL / ADMIN_PASSWORD in .env.
 
 ---
-**Last Updated**: 10 June 2026
+**Last Updated**: 14 July 2026
